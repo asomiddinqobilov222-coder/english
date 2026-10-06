@@ -52,7 +52,15 @@ input:focus,textarea:focus{border-color:var(--i)}
 <script>
 const SCH=[0,1,3,7,30],$=s=>document.querySelector(s),A=$('#app');
 const S=Object.assign({words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true}},JSON.parse(localStorage.getItem('eng')||'{}'));
-const save=()=>localStorage.setItem('eng',JSON.stringify(S));
+const save=()=>{
+
+  localStorage.setItem(
+    'eng',
+    JSON.stringify(S)
+  );
+
+  cloudSaveDebounced();
+};
 const MODES={flash:{i:'🎴',t:'Flashcard',s:'Kartani aylantirib eslang',c:['#3b82f6','#06b6d4']},match:{i:'🔗',t:'Moslashtirish',s:"So'z va tarjimani juftlang",c:['#f97316','#f59e0b']},write:{i:'✍️',t:'Yozish',s:'Tarjimadan inglizchasini yozing',c:['#a855f7','#ec4899']},sent:{i:'💬',t:'Gap rejimi',s:"O'zbekchadan inglizcha gap",c:['#14b8a6','#22c55e']}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rnd=a=>a.map(x=>[Math.random(),x]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
