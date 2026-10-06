@@ -118,10 +118,6 @@ function cloudAutoLogin() {
 
   cloud.autoLoginTried = true;
 
-  if (localStorage.getItem(CLOUD_LINKED_KEY) !== "1") {
-    return;
-  }
-
   if (
     typeof google === "undefined" ||
     !google.accounts ||
