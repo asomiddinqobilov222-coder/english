@@ -8,8 +8,11 @@ const cloud = {
   fileId: null,
   ready: false,
   saving: false,
-  saveTimer: null
+  saveTimer: null,
+  autoLoginTried: false
 };
+
+const CLOUD_LINKED_KEY = "eng-cloud-linked";
 
 
 /* ---------------------------------------------------------
@@ -78,7 +81,12 @@ function cloudLogin() {
 
         cloud.ready = true;
 
-        cloudRender();
+        localStorage.setItem(
+        CLOUD_LINKED_KEY,
+        "1"
+      );
+
+cloudRender();
 
       } catch (error) {
 
@@ -98,6 +106,114 @@ function cloudLogin() {
   });
 }
 
+/* ---------------------------------------------------------
+   Oldin ulangan Google accountni avtomatik qayta ulash
+   --------------------------------------------------------- */
+
+function cloudAutoLogin() {
+
+  if (cloud.autoLoginTried) {
+    return;
+  }
+
+  cloud.autoLoginTried = true;
+
+  if (localStorage.getItem(CLOUD_LINKED_KEY) !== "1") {
+    return;
+  }
+
+  if (
+    typeof google === "undefined" ||
+    !google.accounts ||
+    !google.accounts.oauth2
+  ) {
+    cloud.autoLoginTried = false;
+    setTimeout(cloudAutoLogin, 1000);
+    return;
+  }
+
+  const client = google.accounts.oauth2.initTokenClient({
+
+    client_id: GOOGLE_CLIENT_ID,
+
+    scope:
+      "openid email profile https://www.googleapis.com/auth/drive.file",
+
+    callback: async (response) => {
+
+      if (response.error) {
+
+        console.warn(
+          "Automatic Google login:",
+          response
+        );
+
+        cloudRenderAutoLoginFailed();
+
+        return;
+      }
+
+      cloud.token = response.access_token;
+
+      try {
+
+        await cloudLoadUser();
+
+        await cloudLoadFile();
+
+        cloud.ready = true;
+
+        cloudRender();
+
+      } catch (error) {
+
+        console.error(
+          "Automatic Google Drive connection failed:",
+          error
+        );
+
+        cloud.token = null;
+        cloud.ready = false;
+
+        cloudRenderAutoLoginFailed();
+      }
+    }
+  });
+
+  client.requestAccessToken({
+    prompt: ""
+  });
+}
+
+
+function cloudRenderAutoLoginFailed() {
+
+  const status =
+    document.getElementById("cloud-status");
+
+  const actions =
+    document.getElementById("cloud-actions");
+
+  if (!status || !actions) {
+    return;
+  }
+
+  status.textContent =
+    "Google Drive ulanishini tasdiqlash kerak";
+
+  actions.innerHTML =
+    '<button onclick="cloudLogin()" ' +
+    'style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">' +
+    '🔐 Google orqali kirish' +
+    '</button>';
+}
+
+
+window.addEventListener("load", () => {
+
+  setTimeout(cloudAutoLogin, 300);
+
+});
 
 /* ---------------------------------------------------------
    3. Google user ma'lumotlarini olish
@@ -383,7 +499,7 @@ function cloudLogout() {
   cloud.user = null;
   cloud.fileId = null;
   cloud.ready = false;
-
+  localStorage.removeItem(CLOUD_LINKED_KEY);
   cloudRender();
 }
 
