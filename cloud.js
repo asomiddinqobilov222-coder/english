@@ -14,14 +14,12 @@ const cloud = {
 
 const CLOUD_LINKED_KEY = "eng-cloud-linked";
 
-
 /* ---------------------------------------------------------
    1. Google API orqali so'rov yuborish
    --------------------------------------------------------- */
 
 async function cloudApi(url, options = {}) {
   const headers = new Headers(options.headers || {});
-
   headers.set("Authorization", "Bearer " + cloud.token);
 
   if (options.body && !(options.body instanceof Blob)) {
@@ -41,13 +39,11 @@ async function cloudApi(url, options = {}) {
   return response;
 }
 
-
 /* ---------------------------------------------------------
    2. Google login
    --------------------------------------------------------- */
 
 function cloudLogin() {
-
   if (
     typeof google === "undefined" ||
     !google.accounts ||
@@ -59,12 +55,8 @@ function cloudLogin() {
 
   const client = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
-
-    scope:
-      "openid email profile https://www.googleapis.com/auth/drive.file",
-
+    scope: "openid email profile https://www.googleapis.com/auth/drive.file",
     callback: async (response) => {
-
       if (response.error) {
         console.error(response);
         alert("Google login amalga oshmadi.");
@@ -75,35 +67,20 @@ function cloudLogin() {
       S = defaults();
 
       try {
-
         await cloudLoadUser();
-
         await cloudLoadFile();
-
         cloud.ready = true;
-
-        localStorage.setItem(
-        CLOUD_LINKED_KEY,
-        "1"
-      );
-
-cloudRender();
-
+        localStorage.setItem(CLOUD_LINKED_KEY, "1");
+        cloudRender();
       } catch (error) {
-
         console.error(error);
-
-        alert(
-          "Google Drive bilan ulanishda xatolik yuz berdi.\n\n" +
-          error.message
-        );
-
+        alert("Google Drive bilan ulanishda xatolik yuz berdi.\n\n" + error.message);
       }
     }
   });
 
   client.requestAccessToken({
-    prompt: "consent"
+    prompt: ""
   });
 }
 
@@ -112,7 +89,6 @@ cloudRender();
    --------------------------------------------------------- */
 
 function cloudAutoLogin() {
-
   if (cloud.autoLoginTried) {
     return;
   }
@@ -130,23 +106,12 @@ function cloudAutoLogin() {
   }
 
   const client = google.accounts.oauth2.initTokenClient({
-
     client_id: GOOGLE_CLIENT_ID,
-
-    scope:
-      "openid email profile https://www.googleapis.com/auth/drive.file",
-
+    scope: "openid email profile https://www.googleapis.com/auth/drive.file",
     callback: async (response) => {
-
       if (response.error) {
-
-        console.warn(
-          "Automatic Google login:",
-          response
-        );
-
+        console.warn("Automatic Google login:", response);
         cloudRenderAutoLoginFailed();
-
         return;
       }
 
@@ -154,25 +119,14 @@ function cloudAutoLogin() {
       S = defaults();
 
       try {
-
         await cloudLoadUser();
-
         await cloudLoadFile();
-
         cloud.ready = true;
-
         cloudRender();
-
       } catch (error) {
-
-        console.error(
-          "Automatic Google Drive connection failed:",
-          error
-        );
-
+        console.error("Automatic Google Drive connection failed:", error);
         cloud.token = null;
         cloud.ready = false;
-
         cloudRenderAutoLoginFailed();
       }
     }
@@ -183,34 +137,17 @@ function cloudAutoLogin() {
   });
 }
 
-
 function cloudRenderAutoLoginFailed() {
+  const status = document.getElementById("cloud-status");
+  const actions = document.getElementById("cloud-actions");
+  if (!status || !actions) return;
 
-  const status =
-    document.getElementById("cloud-status");
-
-  const actions =
-    document.getElementById("cloud-actions");
-
-  if (!status || !actions) {
-    return;
-  }
-
-  status.textContent =
-    "Google Drive ulanishini tasdiqlash kerak";
-
-  actions.innerHTML =
-    '<button onclick="cloudLogin()" ' +
-    'style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">' +
-    '🔐 Google orqali kirish' +
-    '</button>';
+  status.textContent = "Google Drive ulanishini tasdiqlash kerak";
+  actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">🔐 Google orqali kirish</button>';
 }
 
-
 window.addEventListener("load", () => {
-
   setTimeout(cloudAutoLogin, 300);
-
 });
 
 /* ---------------------------------------------------------
@@ -218,74 +155,43 @@ window.addEventListener("load", () => {
    --------------------------------------------------------- */
 
 async function cloudLoadUser() {
-
-  const response = await cloudApi(
-    "https://www.googleapis.com/oauth2/v3/userinfo"
-  );
-
+  const response = await cloudApi("https://www.googleapis.com/oauth2/v3/userinfo");
   cloud.user = await response.json();
 }
-
 
 /* ---------------------------------------------------------
    4. Drive'dagi English So'z faylini topish
    --------------------------------------------------------- */
 
 async function cloudLoadFile() {
-
-  const query =
-    "name='english-soz-data.json' " +
-    "and trashed=false " +
-    "and appProperties has { key='app' and value='english-soz' }";
-
-  const url =
-    "https://www.googleapis.com/drive/v3/files" +
-    "?q=" +
-    encodeURIComponent(query) +
-    "&spaces=drive" +
-    "&fields=files(id,name)";
+  const query = "name='english-soz-data.json' and trashed=false and appProperties has { key='app' and value='english-soz' }";
+  const url = "https://www.googleapis.com/drive/v3/files" + "?q=" + encodeURIComponent(query) + "&spaces=drive&fields=files(id,name)";
 
   const response = await cloudApi(url);
-
   const data = await response.json();
 
   if (data.files && data.files.length > 0) {
-
     cloud.fileId = data.files[0].id;
-
     await cloudDownload();
-
   } else {
-
-    // Har bir Google profili yangi, alohida bo'sh lug'atdan boshlaydi.
-    // Qurilmadagi yoki boshqa profildagi holat hech qachon ko'chirilmaydi.
     cloud.fileId = null;
     S = defaults();
     await cloudCreateFile();
-
   }
 }
-
 
 /* ---------------------------------------------------------
    5. Drive'dan ma'lumotni yuklash
    --------------------------------------------------------- */
 
 async function cloudDownload() {
-
-  const response = await cloudApi(
-    "https://www.googleapis.com/drive/v3/files/" +
-    cloud.fileId +
-    "?alt=media"
-  );
-
+  const response = await cloudApi("https://www.googleapis.com/drive/v3/files/" + cloud.fileId + "?alt=media");
   const data = await response.json();
 
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Google Drive fayli noto'g'ri formatda");
   }
 
-  // Butun holatni almashtiramiz; oldingi profil ma'lumotlari qo'shilmaydi.
   S = {
     ...defaults(),
     ...data,
@@ -299,28 +205,24 @@ async function cloudDownload() {
   saveLocal();
 }
 
-
 /* ---------------------------------------------------------
    6. LocalStorage'ga saqlash
    --------------------------------------------------------- */
 
 function saveLocal() {
-  // Ilova ma'lumotlari qurilma localStorage'iga saqlanmaydi.
+  // Exact requirement: all real app data must stay in Google Drive.
+  // Local browser storage is intentionally kept empty to avoid duplicates and stale backups.
   try { localStorage.removeItem("eng"); } catch {}
 }
-
 
 /* ---------------------------------------------------------
    7. Drive'ga yangi fayl yaratish
    --------------------------------------------------------- */
 
 async function cloudCreateFile() {
-
   const metadata = {
     name: "english-soz-data.json",
-
     mimeType: "application/json",
-
     appProperties: {
       app: "english-soz",
       version: "1"
@@ -328,95 +230,61 @@ async function cloudCreateFile() {
   };
 
   const content = JSON.stringify(S);
-
   const form = new FormData();
-
-  form.append(
-    "metadata",
-    new Blob(
-      [JSON.stringify(metadata)],
-      { type: "application/json" }
-    )
-  );
-
-  form.append(
-    "file",
-    new Blob(
-      [content],
-      { type: "application/json" }
-    )
-  );
+  form.append("metadata", new Blob([JSON.stringify(metadata)], {type: "application/json"}));
+  form.append("file", new Blob([content], {type: "application/json"}));
 
   const response = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
     {
       method: "POST",
-
       headers: {
-        Authorization:
-          "Bearer " + cloud.token
+        Authorization: "Bearer " + cloud.token
       },
-
       body: form
     }
   );
 
   if (!response.ok) {
-    throw new Error(
-      await response.text()
-    );
+    throw new Error(await response.text());
   }
 
   const data = await response.json();
-
   cloud.fileId = data.id;
 }
-
 
 /* ---------------------------------------------------------
    8. Drive'dagi mavjud faylni yangilash
    --------------------------------------------------------- */
 
 async function cloudUpdateFile() {
-
   if (!cloud.fileId) {
     await cloudCreateFile();
     return;
   }
 
   const response = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files/" +
-    cloud.fileId +
-    "?uploadType=media",
+    "https://www.googleapis.com/upload/drive/v3/files/" + cloud.fileId + "?uploadType=media",
     {
       method: "PATCH",
-
       headers: {
-        Authorization:
-          "Bearer " + cloud.token,
-
-        "Content-Type":
-          "application/json"
+        Authorization: "Bearer " + cloud.token,
+        "Content-Type": "application/json"
       },
-
       body: JSON.stringify(S)
     }
   );
 
   if (!response.ok) {
-    throw new Error(
-      await response.text()
-    );
+    throw new Error(await response.text());
   }
 }
-
 
 /* ---------------------------------------------------------
    9. Saqlash
    --------------------------------------------------------- */
 
 async function cloudUpload() {
-
   if (!cloud.token) {
     return;
   }
@@ -426,63 +294,41 @@ async function cloudUpload() {
   }
 
   cloud.saving = true;
-
   cloudRender();
 
   try {
-
     saveLocal();
-
     await cloudUpdateFile();
-
   } catch (error) {
-
-    console.error(
-      "Cloud save error:",
-      error
-    );
-
+    console.error("Cloud save error:", error);
   } finally {
-
     cloud.saving = false;
-
     cloudRender();
   }
 }
-
 
 /* ---------------------------------------------------------
    10. Har safar save() bo'lganda Drive'ga yuborish
    --------------------------------------------------------- */
 
 function cloudSaveDebounced() {
-
   if (!cloud.ready) {
     return;
   }
 
   clearTimeout(cloud.saveTimer);
-
   cloud.saveTimer = setTimeout(() => {
-
     cloudUpload();
-
   }, 1200);
 }
-
 
 /* ---------------------------------------------------------
    11. Google'dan chiqish
    --------------------------------------------------------- */
 
 function cloudLogout() {
-
   if (cloud.token) {
-
-    google.accounts.oauth2.revoke(
-      cloud.token,
-      () => {}
-    );
+    google.accounts.oauth2.revoke(cloud.token, () => {});
   }
 
   cloud.token = null;
@@ -490,19 +336,17 @@ function cloudLogout() {
   cloud.fileId = null;
   cloud.ready = false;
   S = defaults();
-  if (typeof aiApiKey !== "undefined") aiApiKey = "";
+  if (typeof groqApiKey !== "undefined") groqApiKey = "";
   try { localStorage.removeItem("eng"); } catch {}
   localStorage.removeItem(CLOUD_LINKED_KEY);
   cloudRender();
 }
-
 
 /* ---------------------------------------------------------
    12. Cloud UI
    --------------------------------------------------------- */
 
 function cloudCard() {
-
   return `
     <div id="cloud-card"
          style="
@@ -512,157 +356,58 @@ function cloudCard() {
            background:rgba(255,255,255,.06);
            border:1px solid rgba(255,255,255,.10);
          ">
-
       <div style="
         display:flex;
         align-items:center;
         justify-content:space-between;
         gap:12px;
       ">
-
         <div>
-
-          <div style="
-            font-size:16px;
-            font-weight:700;
-          ">
-            ☁️ Google Cloud Sync
-          </div>
-
-          <div id="cloud-status"
-               style="
-                 margin-top:5px;
-                 opacity:.7;
-                 font-size:13px;
-               ">
-            Qurilmaga saqlanmoqda
-          </div>
-
+          <div style="font-size:16px;font-weight:700;">☁️ Google Cloud Sync</div>
+          <div id="cloud-status" style="margin-top:5px;opacity:.7;font-size:13px;">Qurilmaga saqlanmoqda</div>
         </div>
-
         <div id="cloud-actions">
-          <button
-            onclick="cloudLogin()"
-            style="
-              padding:10px 14px;
-              border:0;
-              border-radius:12px;
-              cursor:pointer;
-            "
-          >
-            🔐 Google orqali kirish
-          </button>
+          <button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">🔐 Google orqali kirish</button>
         </div>
-
       </div>
-
     </div>
   `;
 }
-
 
 /* ---------------------------------------------------------
    13. Cloud UI yangilash
    --------------------------------------------------------- */
 
 function cloudRender() {
-
-  const status =
-    document.getElementById("cloud-status");
-
-  const actions =
-    document.getElementById("cloud-actions");
+  const status = document.getElementById("cloud-status");
+  const actions = document.getElementById("cloud-actions");
 
   if (!status || !actions) {
     return;
   }
 
   if (!cloud.user) {
-
-    status.textContent =
-      "Ma'lumotlar faqat shu qurilmada saqlanmoqda";
-
+    status.textContent = "Ma'lumotlar faqat shu qurilmada saqlanmoqda";
     actions.innerHTML = `
-      <button
-        onclick="cloudLogin()"
-        style="
-          padding:10px 14px;
-          border:0;
-          border-radius:12px;
-          cursor:pointer;
-        "
-      >
-        🔐 Google orqali kirish
-      </button>
+      <button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">🔐 Google orqali kirish</button>
     `;
-
     return;
   }
 
-
   if (cloud.saving) {
-
-    status.textContent =
-      "☁️ Google Drive'ga saqlanmoqda...";
-
+    status.textContent = "☁️ Google Drive'ga saqlanmoqda...";
   } else {
-
-    status.textContent =
-      "☁️ Google Drive ulangan";
+    status.textContent = "☁️ Google Drive ulangan";
   }
 
-
-  const picture =
-    cloud.user.picture
-      ? `<img
-           src="${cloud.user.picture}"
-           style="
-             width:38px;
-             height:38px;
-             border-radius:50%;
-           "
-         >`
-      : "";
-
+  const picture = cloud.user.picture ? `<img src="${cloud.user.picture}" style="width:38px;height:38px;border-radius:50%;">` : "";
 
   actions.innerHTML = `
-
-    <div style="
-      display:flex;
-      align-items:center;
-      gap:10px;
-    ">
-
+    <div style="display:flex;align-items:center;gap:10px;">
       ${picture}
-
-      <div style="font-size:13px;">
-        ${cloud.user.name || ""}
-      </div>
-
-      <button
-        onclick="cloudUpload()"
-        style="
-          padding:8px 10px;
-          border:0;
-          border-radius:10px;
-          cursor:pointer;
-        "
-      >
-        ☁️
-      </button>
-
-      <button
-        onclick="cloudLogout()"
-        style="
-          padding:8px 10px;
-          border:0;
-          border-radius:10px;
-          cursor:pointer;
-        "
-      >
-        Chiqish
-      </button>
-
+      <div style="font-size:13px;">${cloud.user.name || ""}</div>
+      <button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer;">☁️</button>
+      <button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer;">Chiqish</button>
     </div>
   `;
 }
