@@ -11,6 +11,7 @@ const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random
 const defaults=()=>({words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:'en-US'},history:{}});
 let S=defaults();
 let aiApiKey='';
+try{localStorage.removeItem('eng')}catch{}
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done:[],examples:normalizeExamples(w.examples,w.example)}));
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
 const MODES=[{id:'flash',icon:'🪄',title:'Flashcard',desc:'So‘zni eslab qolish'},{id:'match',icon:'🧩',title:'Moslashtirish',desc:'So‘z va tarjimani topish'},{id:'write',icon:'⌨️',title:'Yozish',desc:'Inglizchasini yozish'},{id:'sentence',icon:'✍️',title:'Gap tuzish',desc:'Gapni tarjima qilib yozish'}];
