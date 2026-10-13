@@ -103,7 +103,8 @@ cloudRender();
   });
 
   client.requestAccessToken({
-    prompt: "consent"
+    // Do not force the consent screen on every manual sign-in.
+    prompt: ""
   });
 }
 
@@ -490,7 +491,7 @@ function cloudLogout() {
   cloud.fileId = null;
   cloud.ready = false;
   S = defaults();
-  if (typeof aiApiKey !== "undefined") aiApiKey = "";
+  if (typeof groqApiKey !== "undefined") groqApiKey = "";
   try { localStorage.removeItem("eng"); } catch {}
   localStorage.removeItem(CLOUD_LINKED_KEY);
   cloudRender();
