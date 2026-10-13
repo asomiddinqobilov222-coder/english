@@ -1,37 +1,668 @@
-/* English So'z cloud sync v2. Google access tokens remain memory-only by design. */
-const CLOUD_LINKED_KEY='eng-cloud-linked';
-const CLOUD_PROFILE_KEY='eng-profile';
-const cloud={token:null,user:null,fileId:null,ready:false,saving:false,pending:false,saveTimer:null,autoLoginTried:false,lastSaved:null};
-function cloudRememberUser(user){cloud.user=user||null;if(user){try{localStorage.setItem(CLOUD_PROFILE_KEY,JSON.stringify({name:user.name||'',email:user.email||'',picture:user.picture||''}))}catch{}}}
-function cloudCachedUser(){try{return JSON.parse(localStorage.getItem(CLOUD_PROFILE_KEY)||'null')}catch{return null}}
-function cloudMerge(local,remote){
- const base=local&&typeof local==='object'?local:{};const incoming=remote&&typeof remote==='object'?remote:{};
- const words=new Map();for(const w of [...(Array.isArray(base.words)?base.words:[]),...(Array.isArray(incoming.words)?incoming.words:[])]){if(!w||!w.id)continue;const id=String(w.id),old=words.get(id);if(!old)words.set(id,{...w,done:[...(w.done||[])]});else{const newer=String(w.added||'')>=String(old.added||'')?w:old;words.set(id,{...old,...newer,done:[...new Set([...(old.done||[]),...(w.done||[])])]})}}
- const progress={};for(const source of [base.progress||{},incoming.progress||{}])for(const [day,p] of Object.entries(source)){if(!progress[day])progress[day]={...p,words:[...(p.words||[])],modes:{...(p.modes||{})},tasks:{...(p.tasks||{})}};else{const d=progress[day];d.words=[...new Set([...(d.words||[]),...(p.words||[])])];d.modes=d.modes||{};for(const [mode,stat] of Object.entries(p.modes||{})){if(!d.modes[mode]||(Number(stat.score)||0)>(Number(d.modes[mode].score)||0))d.modes[mode]=stat}d.tasks={...(d.tasks||{}),...(p.tasks||{})};d.cel=Boolean(d.cel||p.cel)}}
- const mergeObj=(a,b)=>({...a,...b});return {...base,...incoming,words:[...words.values()],progress,cache:{s:mergeObj(base.cache?.s||{},incoming.cache?.s||{}),t:mergeObj(base.cache?.t||{},incoming.cache?.t||{})},set:{...(incoming.set||{}),...(base.set||{})},history:{...(incoming.history||{}),...(base.history||{})}};
+/* =========================================================
+   English So'z — Google Drive Cloud Sync
+   ========================================================= */
+
+const cloud = {
+  token: null,
+  user: null,
+  fileId: null,
+  ready: false,
+  saving: false,
+  saveTimer: null,
+  autoLoginTried: false
+};
+
+const CLOUD_LINKED_KEY = "eng-cloud-linked";
+
+
+/* ---------------------------------------------------------
+   1. Google API orqali so'rov yuborish
+   --------------------------------------------------------- */
+
+async function cloudApi(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+
+  headers.set("Authorization", "Bearer " + cloud.token);
+
+  if (options.body && !(options.body instanceof Blob)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Google API xatosi");
+  }
+
+  return response;
 }
-function cloudLocalData(){try{return JSON.parse(localStorage.getItem('eng')||'{}')}catch{return {}}}
-function cloudSaveLocal(){try{localStorage.setItem('eng',JSON.stringify(S))}catch(e){console.error('Local save failed',e)}}
-async function cloudGetToken({silent=false}={}){return new Promise((resolve,reject)=>{if(!window.google?.accounts?.oauth2){reject(new Error('Google sign-in kutubxonasi yuklanmadi.'));return}const client=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'openid email profile https://www.googleapis.com/auth/drive.file',callback:r=>{if(r.error||!r.access_token){reject(new Error(r.error||'Google ruxsati olinmadi'));return}cloud.token=r.access_token;resolve(r.access_token)},error_callback:e=>reject(new Error(e?.message||'Google sign-in bekor qilindi'))});client.requestAccessToken({prompt:silent?'':'consent'})})}
-async function cloudApi(url,options={},retry=true){const headers=new Headers(options.headers||{});headers.set('Authorization','Bearer '+cloud.token);if(options.body&&!(options.body instanceof Blob)&&!(options.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');let response=await fetch(url,{...options,headers});if(response.status===401&&retry){await cloudGetToken({silent:true});return cloudApi(url,options,false)}if(!response.ok)throw new Error((await response.text()).slice(0,500)||`Google API ${response.status}`);return response}
-async function cloudLoadUser(){const r=await cloudApi('https://www.googleapis.com/oauth2/v3/userinfo');cloudRememberUser(await r.json())}
-async function cloudFindFile(){const q="name='english-soz-data.json' and trashed=false and appProperties has { key='app' and value='english-soz' }";const r=await cloudApi('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&spaces=drive&fields=files(id,name,modifiedTime)');const d=await r.json();return (d.files||[]).sort((a,b)=>String(b.modifiedTime||'').localeCompare(String(a.modifiedTime||'')))[0]||null}
-async function cloudDownload(){if(!cloud.fileId)return;const r=await cloudApi('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(cloud.fileId)+'?alt=media');const remote=await r.json();const local=cloudLocalData();const merged=cloudMerge(local,remote);S={...S,...merged};cloudSaveLocal();}
-async function cloudCreateFile(snapshot){const metadata={name:'english-soz-data.json',mimeType:'application/json',appProperties:{app:'english-soz',version:'2'}};const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));form.append('file',new Blob([snapshot],{type:'application/json'}));const r=await cloudApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',{method:'POST',body:form});const d=await r.json();cloud.fileId=d.id}
-async function cloudUpdateFile(snapshot){if(!cloud.fileId){await cloudCreateFile(snapshot);return}await cloudApi('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(cloud.fileId)+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body:snapshot})}
-async function cloudConnect({silent=false}={}){try{await cloudGetToken({silent});await cloudLoadUser();const file=await cloudFindFile();cloud.fileId=file?.id||null;if(file)await cloudDownload();cloud.ready=true;localStorage.setItem(CLOUD_LINKED_KEY,'1');await cloudUpload();if(typeof render==='function')render();else cloudRender();if(!silent)toast?.('Google Drive bilan ulanish tayyor.')}catch(e){console.warn('Google connection:',e);if(!silent)alert('Google Drive bilan ulanishda muammo: '+e.message);cloud.ready=false;cloud.token=null;cloudRender()}}
-function cloudLogin(){cloudConnect({silent:false})}
-function cloudAutoLogin(){
-  if (cloud.autoLoginTried) return;
+
+
+/* ---------------------------------------------------------
+   2. Google login
+   --------------------------------------------------------- */
+
+function cloudLogin() {
+
+  if (
+    typeof google === "undefined" ||
+    !google.accounts ||
+    !google.accounts.oauth2
+  ) {
+    alert("Google login hali yuklanmadi. Bir necha soniya kutib qayta urinib ko‘r.");
+    return;
+  }
+
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+
+    scope:
+      "openid email profile https://www.googleapis.com/auth/drive.file",
+
+    callback: async (response) => {
+
+      if (response.error) {
+        console.error(response);
+        alert("Google login amalga oshmadi.");
+        return;
+      }
+
+      cloud.token = response.access_token;
+      S = defaults();
+
+      try {
+
+        await cloudLoadUser();
+
+        await cloudLoadFile();
+
+        cloud.ready = true;
+
+        localStorage.setItem(
+        CLOUD_LINKED_KEY,
+        "1"
+      );
+
+cloudRender();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          "Google Drive bilan ulanishda xatolik yuz berdi.\n\n" +
+          error.message
+        );
+
+      }
+    }
+  });
+
+  client.requestAccessToken({
+    prompt: "consent"
+  });
+}
+
+/* ---------------------------------------------------------
+   Oldin ulangan Google accountni avtomatik qayta ulash
+   --------------------------------------------------------- */
+
+function cloudAutoLogin() {
+
+  if (cloud.autoLoginTried) {
+    return;
+  }
+
   cloud.autoLoginTried = true;
 
-  if (!localStorage.getItem(CLOUD_LINKED_KEY)) return;
+  if (
+    typeof google === "undefined" ||
+    !google.accounts ||
+    !google.accounts.oauth2
+  ) {
+    cloud.autoLoginTried = false;
+    setTimeout(cloudAutoLogin, 1000);
+    return;
+  }
 
-  cloud.user = cloudCachedUser();
+  const client = google.accounts.oauth2.initTokenClient({
+
+    client_id: GOOGLE_CLIENT_ID,
+
+    scope:
+      "openid email profile https://www.googleapis.com/auth/drive.file",
+
+    callback: async (response) => {
+
+      if (response.error) {
+
+        console.warn(
+          "Automatic Google login:",
+          response
+        );
+
+        cloudRenderAutoLoginFailed();
+
+        return;
+      }
+
+      cloud.token = response.access_token;
+      S = defaults();
+
+      try {
+
+        await cloudLoadUser();
+
+        await cloudLoadFile();
+
+        cloud.ready = true;
+
+        cloudRender();
+
+      } catch (error) {
+
+        console.error(
+          "Automatic Google Drive connection failed:",
+          error
+        );
+
+        cloud.token = null;
+        cloud.ready = false;
+
+        cloudRenderAutoLoginFailed();
+      }
+    }
+  });
+
+  client.requestAccessToken({
+    prompt: ""
+  });
+}
+
+
+function cloudRenderAutoLoginFailed() {
+
+  const status =
+    document.getElementById("cloud-status");
+
+  const actions =
+    document.getElementById("cloud-actions");
+
+  if (!status || !actions) {
+    return;
+  }
+
+  status.textContent =
+    "Google Drive ulanishini tasdiqlash kerak";
+
+  actions.innerHTML =
+    '<button onclick="cloudLogin()" ' +
+    'style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">' +
+    '🔐 Google orqali kirish' +
+    '</button>';
+}
+
+
+window.addEventListener("load", () => {
+
+  setTimeout(cloudAutoLogin, 300);
+
+});
+
+/* ---------------------------------------------------------
+   3. Google user ma'lumotlarini olish
+   --------------------------------------------------------- */
+
+async function cloudLoadUser() {
+
+  const response = await cloudApi(
+    "https://www.googleapis.com/oauth2/v3/userinfo"
+  );
+
+  cloud.user = await response.json();
+}
+
+
+/* ---------------------------------------------------------
+   4. Drive'dagi English So'z faylini topish
+   --------------------------------------------------------- */
+
+async function cloudLoadFile() {
+
+  const query =
+    "name='english-soz-data.json' " +
+    "and trashed=false " +
+    "and appProperties has { key='app' and value='english-soz' }";
+
+  const url =
+    "https://www.googleapis.com/drive/v3/files" +
+    "?q=" +
+    encodeURIComponent(query) +
+    "&spaces=drive" +
+    "&fields=files(id,name)";
+
+  const response = await cloudApi(url);
+
+  const data = await response.json();
+
+  if (data.files && data.files.length > 0) {
+
+    cloud.fileId = data.files[0].id;
+
+    await cloudDownload();
+
+  } else {
+
+    // Har bir Google profili yangi, alohida bo'sh lug'atdan boshlaydi.
+    // Qurilmadagi yoki boshqa profildagi holat hech qachon ko'chirilmaydi.
+    cloud.fileId = null;
+    S = defaults();
+    await cloudCreateFile();
+
+  }
+}
+
+
+/* ---------------------------------------------------------
+   5. Drive'dan ma'lumotni yuklash
+   --------------------------------------------------------- */
+
+async function cloudDownload() {
+
+  const response = await cloudApi(
+    "https://www.googleapis.com/drive/v3/files/" +
+    cloud.fileId +
+    "?alt=media"
+  );
+
+  const data = await response.json();
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Google Drive fayli noto'g'ri formatda");
+  }
+
+  // Butun holatni almashtiramiz; oldingi profil ma'lumotlari qo'shilmaydi.
+  S = {
+    ...defaults(),
+    ...data,
+    words: Array.isArray(data.words) ? data.words : [],
+    progress: data.progress && typeof data.progress === "object" ? data.progress : {},
+    cache: data.cache && typeof data.cache === "object" ? data.cache : {s:{},t:{}},
+    set: {...defaults().set, ...(data.set || {})},
+    history: data.history && typeof data.history === "object" ? data.history : {}
+  };
+  S.words = S.words.map(w => ({...w, id:String(w.id || uid()), done:Array.isArray(w.done) ? w.done : [], examples:normalizeExamples(w.examples,w.example)}));
+  saveLocal();
+}
+
+
+/* ---------------------------------------------------------
+   6. LocalStorage'ga saqlash
+   --------------------------------------------------------- */
+
+function saveLocal() {
+  // Ilova ma'lumotlari qurilma localStorage'iga saqlanmaydi.
+  try { localStorage.removeItem("eng"); } catch {}
+}
+
+
+/* ---------------------------------------------------------
+   7. Drive'ga yangi fayl yaratish
+   --------------------------------------------------------- */
+
+async function cloudCreateFile() {
+
+  const metadata = {
+    name: "english-soz-data.json",
+
+    mimeType: "application/json",
+
+    appProperties: {
+      app: "english-soz",
+      version: "1"
+    }
+  };
+
+  const content = JSON.stringify(S);
+
+  const form = new FormData();
+
+  form.append(
+    "metadata",
+    new Blob(
+      [JSON.stringify(metadata)],
+      { type: "application/json" }
+    )
+  );
+
+  form.append(
+    "file",
+    new Blob(
+      [content],
+      { type: "application/json" }
+    )
+  );
+
+  const response = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+    {
+      method: "POST",
+
+      headers: {
+        Authorization:
+          "Bearer " + cloud.token
+      },
+
+      body: form
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await response.text()
+    );
+  }
+
+  const data = await response.json();
+
+  cloud.fileId = data.id;
+}
+
+
+/* ---------------------------------------------------------
+   8. Drive'dagi mavjud faylni yangilash
+   --------------------------------------------------------- */
+
+async function cloudUpdateFile() {
+
+  if (!cloud.fileId) {
+    await cloudCreateFile();
+    return;
+  }
+
+  const response = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files/" +
+    cloud.fileId +
+    "?uploadType=media",
+    {
+      method: "PATCH",
+
+      headers: {
+        Authorization:
+          "Bearer " + cloud.token,
+
+        "Content-Type":
+          "application/json"
+      },
+
+      body: JSON.stringify(S)
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await response.text()
+    );
+  }
+}
+
+
+/* ---------------------------------------------------------
+   9. Saqlash
+   --------------------------------------------------------- */
+
+async function cloudUpload() {
+
+  if (!cloud.token) {
+    return;
+  }
+
+  if (cloud.saving) {
+    return;
+  }
+
+  cloud.saving = true;
+
+  cloudRender();
+
+  try {
+
+    saveLocal();
+
+    await cloudUpdateFile();
+
+  } catch (error) {
+
+    console.error(
+      "Cloud save error:",
+      error
+    );
+
+  } finally {
+
+    cloud.saving = false;
+
+    cloudRender();
+  }
+}
+
+
+/* ---------------------------------------------------------
+   10. Har safar save() bo'lganda Drive'ga yuborish
+   --------------------------------------------------------- */
+
+function cloudSaveDebounced() {
+
+  if (!cloud.ready) {
+    return;
+  }
+
+  clearTimeout(cloud.saveTimer);
+
+  cloud.saveTimer = setTimeout(() => {
+
+    cloudUpload();
+
+  }, 1200);
+}
+
+
+/* ---------------------------------------------------------
+   11. Google'dan chiqish
+   --------------------------------------------------------- */
+
+function cloudLogout() {
+
+  if (cloud.token) {
+
+    google.accounts.oauth2.revoke(
+      cloud.token,
+      () => {}
+    );
+  }
+
+  cloud.token = null;
+  cloud.user = null;
+  cloud.fileId = null;
+  cloud.ready = false;
+  S = defaults();
+  if (typeof aiApiKey !== "undefined") aiApiKey = "";
+  try { localStorage.removeItem("eng"); } catch {}
+  localStorage.removeItem(CLOUD_LINKED_KEY);
   cloudRender();
 }
-window.addEventListener('load',()=>setTimeout(cloudAutoLogin,350));
-async function cloudUpload(){if(!cloud.token||!cloud.ready){return}if(cloud.saving){cloud.pending=true;return}cloud.saving=true;try{do{cloud.pending=false;cloudSaveLocal();const snapshot=JSON.stringify(S);await cloudUpdateFile(snapshot);cloud.lastSaved=Date.now();if(snapshot!==JSON.stringify(S))cloud.pending=true}while(cloud.pending)}catch(e){console.error('Drive save failed',e);if(e.message.includes('401')){cloud.ready=false;toast?.('Google ruxsatini qayta tasdiqlash kerak.')}}finally{cloud.saving=false;cloudRender();if(cloud.pending&&cloud.token)setTimeout(()=>cloudUpload(),250)}}
-function cloudSaveDebounced(){if(!cloud.ready)return;clearTimeout(cloud.saveTimer);cloud.saveTimer=setTimeout(()=>cloudUpload(),800)}
-function cloudLogout(){try{if(cloud.token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(cloud.token,()=>{})}catch{}cloud.token=null;cloud.user=null;cloud.fileId=null;cloud.ready=false;cloud.pending=false;localStorage.removeItem(CLOUD_LINKED_KEY);localStorage.removeItem(CLOUD_PROFILE_KEY);cloudRender()}
-function cloudRender(){const status=document.getElementById('cloud-status');if(!status)return;if(cloud.ready)status.textContent=cloud.saving?'☁️ Google Drive’ga saqlanmoqda…':'☁️ Google Drive ulangan';else if(cloud.user||cloudCachedUser())status.textContent='Profil eslab qolingan. Sinxronlash uchun Google ruxsati kerak bo‘lishi mumkin.';else status.textContent='Ma’lumotlar hozircha shu qurilmada saqlanmoqda.'}
+
+
+/* ---------------------------------------------------------
+   12. Cloud UI
+   --------------------------------------------------------- */
+
+function cloudCard() {
+
+  return `
+    <div id="cloud-card"
+         style="
+           margin:12px 0;
+           padding:16px;
+           border-radius:18px;
+           background:rgba(255,255,255,.06);
+           border:1px solid rgba(255,255,255,.10);
+         ">
+
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+      ">
+
+        <div>
+
+          <div style="
+            font-size:16px;
+            font-weight:700;
+          ">
+            ☁️ Google Cloud Sync
+          </div>
+
+          <div id="cloud-status"
+               style="
+                 margin-top:5px;
+                 opacity:.7;
+                 font-size:13px;
+               ">
+            Qurilmaga saqlanmoqda
+          </div>
+
+        </div>
+
+        <div id="cloud-actions">
+          <button
+            onclick="cloudLogin()"
+            style="
+              padding:10px 14px;
+              border:0;
+              border-radius:12px;
+              cursor:pointer;
+            "
+          >
+            🔐 Google orqali kirish
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* ---------------------------------------------------------
+   13. Cloud UI yangilash
+   --------------------------------------------------------- */
+
+function cloudRender() {
+
+  const status =
+    document.getElementById("cloud-status");
+
+  const actions =
+    document.getElementById("cloud-actions");
+
+  if (!status || !actions) {
+    return;
+  }
+
+  if (!cloud.user) {
+
+    status.textContent =
+      "Ma'lumotlar faqat shu qurilmada saqlanmoqda";
+
+    actions.innerHTML = `
+      <button
+        onclick="cloudLogin()"
+        style="
+          padding:10px 14px;
+          border:0;
+          border-radius:12px;
+          cursor:pointer;
+        "
+      >
+        🔐 Google orqali kirish
+      </button>
+    `;
+
+    return;
+  }
+
+
+  if (cloud.saving) {
+
+    status.textContent =
+      "☁️ Google Drive'ga saqlanmoqda...";
+
+  } else {
+
+    status.textContent =
+      "☁️ Google Drive ulangan";
+  }
+
+
+  const picture =
+    cloud.user.picture
+      ? `<img
+           src="${cloud.user.picture}"
+           style="
+             width:38px;
+             height:38px;
+             border-radius:50%;
+           "
+         >`
+      : "";
+
+
+  actions.innerHTML = `
+
+    <div style="
+      display:flex;
+      align-items:center;
+      gap:10px;
+    ">
+
+      ${picture}
+
+      <div style="font-size:13px;">
+        ${cloud.user.name || ""}
+      </div>
+
+      <button
+        onclick="cloudUpload()"
+        style="
+          padding:8px 10px;
+          border:0;
+          border-radius:10px;
+          cursor:pointer;
+        "
+      >
+        ☁️
+      </button>
+
+      <button
+        onclick="cloudLogout()"
+        style="
+          padding:8px 10px;
+          border:0;
+          border-radius:10px;
+          cursor:pointer;
+        "
+      >
+        Chiqish
+      </button>
+
+    </div>
+  `;
+}
