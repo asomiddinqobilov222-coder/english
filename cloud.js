@@ -72,6 +72,7 @@ function cloudLogin() {
       }
 
       cloud.token = response.access_token;
+      S = defaults();
 
       try {
 
@@ -150,6 +151,7 @@ function cloudAutoLogin() {
       }
 
       cloud.token = response.access_token;
+      S = defaults();
 
       try {
 
@@ -255,11 +257,11 @@ async function cloudLoadFile() {
 
   } else {
 
+    // Har bir Google profili yangi, alohida bo'sh lug'atdan boshlaydi.
+    // Qurilmadagi yoki boshqa profildagi holat hech qachon ko'chirilmaydi.
     cloud.fileId = null;
-
-    // Hozirgi qurilmadagi ma'lumotlarni
-    // birinchi marta Drive'ga yuklaymiz.
-    await cloudUpload();
+    S = defaults();
+    await cloudCreateFile();
 
   }
 }
@@ -279,26 +281,21 @@ async function cloudDownload() {
 
   const data = await response.json();
 
-  if (!data || typeof data !== "object") {
-    return;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Google Drive fayli noto'g'ri formatda");
   }
 
-  if (data.words !== undefined) {
-    S.words = data.words;
-  }
-
-  if (data.progress !== undefined) {
-    S.progress = data.progress;
-  }
-
-  if (data.cache !== undefined) {
-    S.cache = data.cache;
-  }
-
-  if (data.set !== undefined) {
-    S.set = data.set;
-  }
-
+  // Butun holatni almashtiramiz; oldingi profil ma'lumotlari qo'shilmaydi.
+  S = {
+    ...defaults(),
+    ...data,
+    words: Array.isArray(data.words) ? data.words : [],
+    progress: data.progress && typeof data.progress === "object" ? data.progress : {},
+    cache: data.cache && typeof data.cache === "object" ? data.cache : {s:{},t:{}},
+    set: {...defaults().set, ...(data.set || {})},
+    history: data.history && typeof data.history === "object" ? data.history : {}
+  };
+  S.words = S.words.map(w => ({...w, id:String(w.id || uid()), done:Array.isArray(w.done) ? w.done : [], examples:normalizeExamples(w.examples,w.example)}));
   saveLocal();
 }
 
@@ -308,11 +305,8 @@ async function cloudDownload() {
    --------------------------------------------------------- */
 
 function saveLocal() {
-
-  localStorage.setItem(
-    "eng",
-    JSON.stringify(S)
-  );
+  // Ilova ma'lumotlari qurilma localStorage'iga saqlanmaydi.
+  try { localStorage.removeItem("eng"); } catch {}
 }
 
 
@@ -495,6 +489,9 @@ function cloudLogout() {
   cloud.user = null;
   cloud.fileId = null;
   cloud.ready = false;
+  S = defaults();
+  if (typeof aiApiKey !== "undefined") aiApiKey = "";
+  try { localStorage.removeItem("eng"); } catch {}
   localStorage.removeItem(CLOUD_LINKED_KEY);
   cloudRender();
 }
