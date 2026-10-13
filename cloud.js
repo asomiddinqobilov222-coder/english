@@ -21,7 +21,15 @@ async function cloudCreateFile(snapshot){const metadata={name:'english-soz-data.
 async function cloudUpdateFile(snapshot){if(!cloud.fileId){await cloudCreateFile(snapshot);return}await cloudApi('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(cloud.fileId)+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body:snapshot})}
 async function cloudConnect({silent=false}={}){try{await cloudGetToken({silent});await cloudLoadUser();const file=await cloudFindFile();cloud.fileId=file?.id||null;if(file)await cloudDownload();cloud.ready=true;localStorage.setItem(CLOUD_LINKED_KEY,'1');await cloudUpload();if(typeof render==='function')render();else cloudRender();if(!silent)toast?.('Google Drive bilan ulanish tayyor.')}catch(e){console.warn('Google connection:',e);if(!silent)alert('Google Drive bilan ulanishda muammo: '+e.message);cloud.ready=false;cloud.token=null;cloudRender()}}
 function cloudLogin(){cloudConnect({silent:false})}
-function cloudAutoLogin(){if(cloud.autoLoginTried)return;cloud.autoLoginTried=true;if(!localStorage.getItem(CLOUD_LINKED_KEY))return;cloud.user=cloudCachedUser();if(!window.google?.accounts?.oauth2){setTimeout(()=>{cloud.autoLoginTried=false;cloudAutoLogin()},900);return}cloudConnect({silent:true})}
+function cloudAutoLogin(){
+  if (cloud.autoLoginTried) return;
+  cloud.autoLoginTried = true;
+
+  if (!localStorage.getItem(CLOUD_LINKED_KEY)) return;
+
+  cloud.user = cloudCachedUser();
+  cloudRender();
+}
 window.addEventListener('load',()=>setTimeout(cloudAutoLogin,350));
 async function cloudUpload(){if(!cloud.token||!cloud.ready){return}if(cloud.saving){cloud.pending=true;return}cloud.saving=true;try{do{cloud.pending=false;cloudSaveLocal();const snapshot=JSON.stringify(S);await cloudUpdateFile(snapshot);cloud.lastSaved=Date.now();if(snapshot!==JSON.stringify(S))cloud.pending=true}while(cloud.pending)}catch(e){console.error('Drive save failed',e);if(e.message.includes('401')){cloud.ready=false;toast?.('Google ruxsatini qayta tasdiqlash kerak.')}}finally{cloud.saving=false;cloudRender();if(cloud.pending&&cloud.token)setTimeout(()=>cloudUpload(),250)}}
 function cloudSaveDebounced(){if(!cloud.ready)return;clearTimeout(cloud.saveTimer);cloud.saveTimer=setTimeout(()=>cloudUpload(),800)}
