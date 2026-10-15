@@ -484,7 +484,33 @@ function cloudSaveDebounced() {
    11. Google'dan chiqish
    --------------------------------------------------------- */
 
-function cloudLogout() {
+async function cloudLogout() {
+  // Chiqishdan oldin rejalashtirilgan va davom etayotgan saqlashlarni tugatamiz.
+  let attempts = 0;
+  while (cloud.ready && cloud.token && attempts < 5) {
+    if (cloud.saving) {
+      await new Promise(resolve => {
+        const poll = () => cloud.saving ? setTimeout(poll, 50) : resolve();
+        poll();
+      });
+    }
+    const scheduled = !!cloud.saveTimer;
+    if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+    cloud.saveTimer = null;
+    if (cloud.lastError) {
+      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      break;
+    }
+    if (!scheduled && !cloud.pendingSave) break;
+    cloud.pendingSave = false;
+    await cloudUpload();
+    attempts++;
+    if (cloud.lastError) {
+      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      break;
+    }
+  }
+
   try { saveLocal(); } catch {}
   if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
   cloud.saveTimer = null;
