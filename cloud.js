@@ -8,12 +8,24 @@ const cloud = {
   fileId: null,
   ready: false,
   saving: false,
+  pendingSave: false,
+  lastError: "",
+  preserveCurrentIfMissing: false,
   saveTimer: null,
   autoLoginTried: false
 };
 
 const CLOUD_LINKED_KEY = "eng-cloud-linked";
 const CLOUD_PROFILE_KEY = "eng-cloud-profile";
+
+function cloudDataStorageKey(user = cloud.user) {
+  const identity = user?.sub || user?.email;
+  return identity ? "eng-data:" + encodeURIComponent(String(identity).toLowerCase()) : "eng-data:local";
+}
+function saveLocal() {
+  try { localStorage.setItem(cloudDataStorageKey(), JSON.stringify(S)); }
+  catch (error) { console.warn("Local backup could not be saved:", error); if (typeof toast === "function") toast("Qurilmadagi zaxira saqlanmadi. Xotira joyini tekshiring."); }
+}
 try {
   const remembered = JSON.parse(localStorage.getItem(CLOUD_PROFILE_KEY) || "null");
   if (remembered && remembered.email) cloud.user = remembered;
@@ -57,8 +69,11 @@ async function cloudApi(url, options = {}) {
    --------------------------------------------------------- */
 
 function cloudLogin() {
+  const previousUser = cloud.user ? {...cloud.user} : null;
+  const previousIdentity = previousUser?.email?.toLowerCase() || "";
+  const localSnapshot = JSON.parse(JSON.stringify(S));
 
-  if (
+  if ( 
     typeof google === "undefined" ||
     !google.accounts ||
     !google.accounts.oauth2
@@ -82,14 +97,27 @@ function cloudLogin() {
       }
 
       cloud.token = response.access_token;
-      S = defaults();
+      cloud.lastError = "";
 
       try {
-
         await cloudLoadUser();
+        const currentIdentity = cloud.user?.email?.toLowerCase() || "";
+        let profileSnapshot = null;
+        try {
+          const raw = localStorage.getItem(cloudDataStorageKey());
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object" && Array.isArray(parsed.words)) profileSnapshot = parsed;
+          }
+        } catch {}
+        cloud.preserveCurrentIfMissing = Boolean(profileSnapshot) || !previousIdentity || previousIdentity === currentIdentity;
+        S = profileSnapshot
+          ? {...defaults(), ...profileSnapshot}
+          : cloud.preserveCurrentIfMissing ? localSnapshot : defaults();
 
         await cloudLoadFile();
 
+        cloud.preserveCurrentIfMissing = false;
         cloud.ready = true;
 
         localStorage.setItem(
@@ -100,14 +128,17 @@ function cloudLogin() {
 cloudRender();
 
       } catch (error) {
-
         console.error(error);
-
-        alert(
-          "Google Drive bilan ulanishda xatolik yuz berdi.\n\n" +
-          error.message
-        );
-
+        cloud.token = null;
+        cloud.user = previousUser;
+        S = localSnapshot;
+        cloud.ready = false;
+        cloud.preserveCurrentIfMissing = false;
+        cloud.lastError = error?.message || "Noma'lum xato";
+        if (typeof restoreAiKeyForCurrentProfile === "function") restoreAiKeyForCurrentProfile();
+        saveLocal();
+        cloudRender();
+        alert("Google Drive bilan ulanishda xatolik yuz berdi.\n\n" + cloud.lastError);
       }
     }
   });
@@ -164,14 +195,13 @@ function cloudAutoLogin() {
       }
 
       cloud.token = response.access_token;
-      S = defaults();
+      cloud.lastError = "";
+      cloud.preserveCurrentIfMissing = true;
 
       try {
-
         await cloudLoadUser();
-
         await cloudLoadFile();
-
+        cloud.preserveCurrentIfMissing = false;
         cloud.ready = true;
 
         cloudRender();
@@ -185,6 +215,8 @@ function cloudAutoLogin() {
 
         cloud.token = null;
         cloud.ready = false;
+        cloud.preserveCurrentIfMissing = false;
+        cloud.lastError = error?.message || "Noma'lum xato";
 
         cloudRenderAutoLoginFailed();
       }
@@ -255,13 +287,10 @@ async function cloudLoadFile() {
     await cloudDownload();
 
   } else {
-
-    // Har bir Google profili yangi, alohida bo'sh lug'atdan boshlaydi.
-    // Qurilmadagi yoki boshqa profildagi holat hech qachon ko'chirilmaydi.
     cloud.fileId = null;
-    S = defaults();
+    if (!cloud.preserveCurrentIfMissing) S = defaults();
     await cloudCreateFile();
-
+    saveLocal();
   }
 }
 
@@ -303,10 +332,7 @@ async function cloudDownload() {
    6. LocalStorage'ga saqlash
    --------------------------------------------------------- */
 
-function saveLocal() {
-  // Ilova ma'lumotlari qurilma localStorage'iga saqlanmaydi.
-  try { localStorage.removeItem("eng"); } catch {}
-}
+// saveLocal() above stores an account-scoped local backup.
 
 
 /* ---------------------------------------------------------
@@ -415,37 +441,28 @@ async function cloudUpdateFile() {
    --------------------------------------------------------- */
 
 async function cloudUpload() {
-
-  if (!cloud.token) {
-    return;
-  }
-
-  if (cloud.saving) {
-    return;
-  }
-
+  if (!cloud.token || !cloud.ready) return;
+  if (cloud.saving) { cloud.pendingSave = true; return; }
   cloud.saving = true;
-
+  cloud.pendingSave = false;
+  cloud.lastError = "";
+  if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+  cloud.saveTimer = null;
   cloudRender();
-
   try {
-
     saveLocal();
-
     await cloudUpdateFile();
-
   } catch (error) {
-
-    console.error(
-      "Cloud save error:",
-      error
-    );
-
+    cloud.lastError = error?.message || "Noma'lum xato";
+    console.error("Cloud save error:", error);
   } finally {
-
     cloud.saving = false;
-
     cloudRender();
+    if (cloud.pendingSave && cloud.ready && cloud.token) {
+      cloud.pendingSave = false;
+      if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+      cloud.saveTimer = setTimeout(() => cloudUpload(), 250);
+    }
   }
 }
 
@@ -455,18 +472,11 @@ async function cloudUpload() {
    --------------------------------------------------------- */
 
 function cloudSaveDebounced() {
-
-  if (!cloud.ready) {
-    return;
-  }
-
-  clearTimeout(cloud.saveTimer);
-
-  cloud.saveTimer = setTimeout(() => {
-
-    cloudUpload();
-
-  }, 1200);
+  saveLocal();
+  if (!cloud.ready || !cloud.token) return;
+  cloud.pendingSave = true;
+  if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+  cloud.saveTimer = setTimeout(() => cloudUpload(), 1200);
 }
 
 
@@ -474,25 +484,50 @@ function cloudSaveDebounced() {
    11. Google'dan chiqish
    --------------------------------------------------------- */
 
-function cloudLogout() {
-
-  if (cloud.token) {
-
-    google.accounts.oauth2.revoke(
-      cloud.token,
-      () => {}
-    );
+async function cloudLogout() {
+  // Chiqishdan oldin rejalashtirilgan va davom etayotgan saqlashlarni tugatamiz.
+  let attempts = 0;
+  while (cloud.ready && cloud.token && attempts < 5) {
+    if (cloud.saving) {
+      await new Promise(resolve => {
+        const poll = () => cloud.saving ? setTimeout(poll, 50) : resolve();
+        poll();
+      });
+    }
+    const scheduled = !!cloud.saveTimer;
+    if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+    cloud.saveTimer = null;
+    if (cloud.lastError) {
+      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      break;
+    }
+    if (!scheduled && !cloud.pendingSave) break;
+    cloud.pendingSave = false;
+    await cloudUpload();
+    attempts++;
+    if (cloud.lastError) {
+      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      break;
+    }
   }
 
+  try { saveLocal(); } catch {}
+  if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
+  cloud.saveTimer = null;
+  if (cloud.token && typeof google !== "undefined" && google.accounts?.oauth2?.revoke) {
+    try { google.accounts.oauth2.revoke(cloud.token, () => {}); } catch {}
+  }
   cloud.token = null;
   cloud.user = null;
-  try { localStorage.removeItem(CLOUD_PROFILE_KEY); } catch {}
   cloud.fileId = null;
   cloud.ready = false;
-  S = defaults();
+  cloud.saving = false;
+  cloud.pendingSave = false;
+  cloud.lastError = "";
+  cloud.preserveCurrentIfMissing = false;
+  try { localStorage.removeItem(CLOUD_PROFILE_KEY); localStorage.removeItem(CLOUD_LINKED_KEY); } catch {}
   if (typeof groqApiKey !== "undefined") groqApiKey = "";
-  try { localStorage.removeItem("eng"); } catch {}
-  localStorage.removeItem(CLOUD_LINKED_KEY);
+  S = defaults();
   cloudRender();
 }
 
@@ -602,6 +637,8 @@ function cloudRender() {
 
   if (cloud.saving) {
     status.textContent = "☁️ Google Drive'ga saqlanmoqda...";
+  } else if (cloud.lastError && cloud.ready && cloud.token) {
+    status.textContent = "⚠️ Saqlash xatosi. Qayta saqlash tugmasini bosing.";
   } else if (cloud.ready && cloud.token) {
     status.textContent = "☁️ Google Drive ulangan";
   } else {
@@ -627,7 +664,7 @@ function cloudRender() {
       ${picture}
       <div style="font-size:13px;flex:1;min-width:90px">${cloud.user.name || cloud.user.email || ""}</div>
       ${cloud.ready && cloud.token
-        ? '<button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Saqlash</button>'
+        ? '<button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Saqlash / qayta urinish</button>'
         : '<button onclick="cloudLogin()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Drive’ni ulash</button>'}
       <button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button>
     </div>
