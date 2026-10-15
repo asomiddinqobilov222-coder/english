@@ -31,9 +31,13 @@ try {
   if (remembered && remembered.email) cloud.user = remembered;
 } catch {}
 function cloudRememberProfile(user) {
+  const previousIdentity = String(cloud.user?.sub || cloud.user?.email || "").trim().toLowerCase();
+  const nextIdentity = String(user?.sub || user?.email || "").trim().toLowerCase();
   cloud.user = user;
   try { if (user && user.email) localStorage.setItem(CLOUD_PROFILE_KEY, JSON.stringify(user)); } catch {}
-  if (typeof restoreAiKeyForCurrentProfile === "function") restoreAiKeyForCurrentProfile();
+  // Refreshing the same Google profile must not erase the AI key kept in memory.
+  // Clear it only when switching to a different account.
+  if (previousIdentity !== nextIdentity && typeof restoreAiKeyForCurrentProfile === "function") restoreAiKeyForCurrentProfile();
 }
 
 
