@@ -460,6 +460,7 @@ async function cloudUpload() {
     cloudRender();
     if (cloud.pendingSave && cloud.ready && cloud.token) {
       cloud.pendingSave = false;
+      if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
       cloud.saveTimer = setTimeout(() => cloudUpload(), 250);
     }
   }
