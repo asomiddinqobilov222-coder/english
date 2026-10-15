@@ -9,15 +9,31 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const defaults=()=>({words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:'en-US'},history:{}});
-let S=defaults();
+function loadLocalState(){
+  try {
+    const key = typeof cloudDataStorageKey === 'function' ? cloudDataStorageKey() : 'eng-data:local';
+    let raw = localStorage.getItem(key);
+    if (!raw && !cloud?.user) raw = localStorage.getItem('eng');
+    const data = JSON.parse(raw || 'null');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return defaults();
+    return {...defaults(), ...data,
+      words: Array.isArray(data.words) ? data.words : [],
+      progress: data.progress && typeof data.progress === 'object' ? data.progress : {},
+      cache: data.cache && typeof data.cache === 'object' ? data.cache : {s:{},t:{}},
+      set: {...defaults().set, ...(data.set || {})},
+      history: data.history && typeof data.history === 'object' ? data.history : {}
+    };
+  } catch (error) { console.warn('Local backup could not be loaded:', error); return defaults(); }
+}
+let S=loadLocalState();
 let groqApiKey='';
 const AI_KEY_DEVICE_STORAGE='english-soz-groq-key:device';
 function aiKeyStorageName(){const u=cloud?.user;const identity=u?.sub||u?.email;return identity?'english-soz-groq-key:'+String(identity).toLowerCase():AI_KEY_DEVICE_STORAGE}
 function restoreAiKeyForCurrentProfile(){try{const identity=cloud?.user?.sub||cloud?.user?.email;if(identity){const keyName=aiKeyStorageName();let saved=localStorage.getItem(keyName);if(!saved){const deviceKey=localStorage.getItem(AI_KEY_DEVICE_STORAGE);if(deviceKey){saved=deviceKey;localStorage.setItem(keyName,deviceKey);localStorage.removeItem(AI_KEY_DEVICE_STORAGE)}}groqApiKey=saved||''}else groqApiKey=localStorage.getItem(AI_KEY_DEVICE_STORAGE)||''}catch{groqApiKey=''}}
 function persistAiKey(key){try{localStorage.setItem(aiKeyStorageName(),key)}catch{toast('Kalit bu qurilmada saqlanmadi. Brauzer xotirasiga ruxsat bering.')}}
 restoreAiKeyForCurrentProfile();
-try{localStorage.removeItem('eng')}catch{}
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
+saveLocal();
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
 const MODES=[{id:'flash',icon:'🪄',title:'Flashcard',desc:'So‘zni eslab qolish'},{id:'match',icon:'🧩',title:'Moslashtirish',desc:'So‘z va tarjimani topish'},{id:'write',icon:'⌨️',title:'Yozish',desc:'Inglizchasini yozish'},{id:'sentence',icon:'✍️',title:'Gap tuzish',desc:'Gapni tarjima qilib yozish'}];
 let page='home',task=null,modalResolve=null,flash=null,match=null,write=null,sentence=null,translator={sl:'en',tl:'uz',result:'',examples:[]},matchState=null;
@@ -28,7 +44,16 @@ function dayDate(key){const [y,m,d]=String(key||today()).split('-').map(Number);
 function due(w){if(w.reviewedOn===today())return false;const done=Array.isArray(w.done)?w.done:[];const next=REVIEW_INTERVALS.find(n=>!done.includes(n));if(next===undefined)return false;const dueDate=dayDate(w.added||today());dueDate.setDate(dueDate.getDate()+next);return dueDate<=dayDate(today())}
 function dueWords(){return S.words.filter(due)}
 function markReviewed(words){const todayKey=today();for(const w of words||[]){if(!w||w.reviewedOn===todayKey)continue;const done=Array.isArray(w.done)?w.done:(w.done=[]);const next=REVIEW_INTERVALS.find(n=>!done.includes(n));if(next===undefined)continue;const dueDate=dayDate(w.added||today());dueDate.setDate(dueDate.getDate()+next);if(dueDate<=dayDate(today())){done.push(next);w.reviewedOn=todayKey}}}
-function saveLocal(){try{localStorage.removeItem('eng')}catch{}}function save(){saveLocal();if(typeof cloudSaveDebounced==='function')cloudSaveDebounced()}
+function saveLocal(){
+  try {
+    const key = typeof cloudDataStorageKey === 'function' ? cloudDataStorageKey() : 'eng-data:local';
+    localStorage.setItem(key, JSON.stringify(S));
+  } catch (error) {
+    console.warn('Local backup could not be saved:', error);
+    toast('Qurilmadagi zaxira saqlanmadi. Xotira joyini tekshiring.');
+  }
+}
+function save(){saveLocal();if(typeof cloudSaveDebounced==='function')cloudSaveDebounced()}
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2400)}
 function sound(ok=true){if(!S.set.sound)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=ok?740:230;g.gain.setValueAtTime(.0001,c.currentTime);g.gain.exponentialRampToValueAtTime(.055,c.currentTime+.015);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.12);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.13);o.onended=()=>c.close()}catch{}}
 function vibrate(pattern=25){if(S.set.vib&&navigator.vibrate)navigator.vibrate(pattern)}
@@ -86,8 +111,23 @@ const oldRender=render;render=function(){if(page==='result'){nav();$('#app').inn
 function openWordList(){const list=[...S.words].sort((a,b)=>a.translation.localeCompare(b.translation,'uz'));const body=list.length?'<p class="subhead">Jami '+list.length+' ta so‘z. Keraksiz so‘zni 🗑 tugmasi orqali o‘chirishingiz mumkin.</p><div style="max-height:55vh;overflow:auto">'+list.map((w,i)=>'<div class="list-item"><div style="min-width:0;flex:1"><b>'+(i+1)+'. '+esc(w.translation)+'</b><small>'+esc(w.added||'')+'</small></div><span class="badge">'+((w.done||[]).length?'Takrorlangan':'Yangi')+'</span><button class="btn danger small" style="margin-left:8px" onclick="deleteWord(&quot;'+esc(w.id)+'&quot;)" aria-label="So‘zni o‘chirish">🗑</button></div>').join('')+'</div>':'<p class="subhead">Hali so‘z qo‘shilmagan.</p>';modal('So‘zlar ro‘yxati',body)}
 async function deleteWord(id){const w=S.words.find(x=>x.id===id);if(!w)return;const ok=await modal('So‘zni o‘chirish','<p class="subhead">“'+esc(w.word)+' — '+esc(w.translation)+'” lug‘atdan butunlay o‘chirilsinmi?</p>',[{text:'Bekor qilish',value:false},{text:'O‘chirish',value:true,primary:true}]);if(!ok)return;S.words=S.words.filter(x=>x.id!==id);for(const p of Object.values(S.progress||{})){if(Array.isArray(p.words))p.words=p.words.filter(x=>x!==id)}save();render();toast('So‘z o‘chirildi.');openWordList()}
 function openTodayWords(){const list=dueWords();modal('Bugungi so‘zlar',list.length?`<p class="subhead">${list.length} ta so‘z mashq uchun tayyor. Inglizcha tarjimalar yashirilgan.</p><div style="max-height:55vh;overflow:auto">${list.map((w,i)=>`<div class="list-item"><b>${i+1}. ${esc(w.translation)}</b><span class="badge">Bugun</span></div>`).join('')}</div>`:'<p class="subhead">Bugun uchun so‘z yo‘q. Lug‘atga yangi so‘z qo‘shishingiz mumkin.</p>')}
-function openCalendar(){const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1),days=new Date(year,month+1,0).getDate(),offset=(first.getDay()+6)%7;let cells='';for(let i=0;i<offset;i++)cells+='<span></span>';for(let n=1;n<=days;n++){const d=new Date(year,month,n),k=dateKey(d),p=S.progress[k],count=Object.keys(p?.modes||{}).length,cls=count===4?'full':count?'partial':'',tod=k===today()?'today':'';cells+=`<div class="cal-day ${cls} ${tod}" title="${count}/4 vazifa" aria-label="${k}: ${count}/4">${n}</div>`}modal('Mashqlar kalendari',`<p class="subhead">${now.toLocaleDateString('uz-UZ',{month:'long',year:'numeric'})} · 🟢 4/4 bajarilgan · 🟡 qisman · oddiy rang — bajarilmagan</p><div class="calendar" style="margin-top:15px">${['Du','Se','Ch','Pa','Ju','Sh','Ya'].map(x=>`<div class="cal-head">${x}</div>`).join('')}${cells}</div><div class="row spread" style="margin-top:15px"><span class="badge">Joriy zanjir: ${streak()} kun</span><span class="badge">Bugun: ${Object.keys(progressFor().modes).length}/4</span></div>`)}
-async function confirmLogout(){const ok=await modal('Google profilidan chiqilsinmi?','<p class="subhead">Lug‘at qurilmada qoladi. Profilni uzsangiz, Drive sinxronlash to‘xtaydi.</p>',[{text:'Bekor qilish',value:false},{text:'Ha, chiqish',value:true,primary:true}]);if(ok&&typeof cloudLogout==='function'){cloudLogout();toast('Google profili uzildi.');render()}}
+let calendarMonthOffset=0;
+function changeCalendarMonth(delta){calendarMonthOffset+=delta;openCalendar()}
+function openCalendar(){
+  const monthDate=new Date(new Date().getFullYear(),new Date().getMonth()+calendarMonthOffset,1);
+  const year=monthDate.getFullYear(),month=monthDate.getMonth(),first=new Date(year,month,1),days=new Date(year,month+1,0).getDate(),offset=(first.getDay()+6)%7;
+  const monthKey=`${year}-${String(month+1).padStart(2,'0')}`;
+  let cells='';
+  for(let i=0;i<offset;i++)cells+='<span></span>';
+  for(let n=1;n<=days;n++){
+    const d=new Date(year,month,n),k=dateKey(d),p=S.progress[k],count=Object.keys(p?.modes||{}).length;
+    const cls=count===4?'full':count?'partial':'',tod=k===today()?'today':'';
+    cells+=`<div class="cal-day ${cls} ${tod}" title="${count}/4 vazifa" aria-label="${k}: ${count}/4">${n}</div>`;
+  }
+  const completeDays=Object.keys(S.progress||{}).filter(k=>k.startsWith(monthKey+'-')&&Object.keys(S.progress[k]?.modes||{}).length===4).length;
+  modal('Mashqlar kalendari',`<div class="row spread" style="align-items:center;gap:8px"><button class="btn ghost small" onclick="changeCalendarMonth(-1)" aria-label="Oldingi oy">‹ Oldingi</button><b>${monthDate.toLocaleDateString('uz-UZ',{month:'long',year:'numeric'})}</b><button class="btn ghost small" onclick="changeCalendarMonth(1)" aria-label="Keyingi oy">Keyingi ›</button></div><p class="subhead" style="margin-top:10px">🟢 4/4 bajarilgan · 🟡 qisman · oddiy rang — bajarilmagan</p><div class="calendar" style="margin-top:15px">${['Du','Se','Ch','Pa','Ju','Sh','Ya'].map(x=>`<div class="cal-head">${x}</div>`).join('')}${cells}</div><div class="row spread" style="margin-top:15px"><span class="badge">Joriy zanjir: ${streak()} kun</span><span class="badge">Bu oy: ${completeDays} to‘liq kun</span></div>`)
+}
+async function confirmLogout(){const ok=await modal('Google profilidan chiqilsinmi?','<p class="subhead">Lug‘at Google Drive va shu hisobga bog‘langan zaxirada saqlanadi. Chiqilgach, ma’lumotlar boshqa Google hisobiga aralashmaydi.</p>',[{text:'Bekor qilish',value:false},{text:'Ha, chiqish',value:true,primary:true}]);if(ok&&typeof cloudLogout==='function'){cloudLogout();toast('Google profili uzildi.');render()}}
 function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`english-soz-${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast('Zaxira fayli tayyor.')}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.words))throw Error('format');const ok=await modal('Ma’lumotni tiklash','<p class="subhead">Joriy lug‘at o‘rniga zaxiradagi ma’lumotlar yuklanadi. Avval eksport qilib qo‘yish tavsiya etiladi.</p>',[{text:'Bekor qilish',value:false},{text:'Tiklash',value:true,primary:true}]);if(!ok)return;S={...defaults(),...data,set:{...defaults().set,...data.set}};S.words=S.words.map(w=>({...w,id:String(w.id||uid()),done:Array.isArray(w.done)?w.done:[],examples:normalizeExamples(w.examples,w.example)}));save();render();toast('Ma’lumot tiklandi.')}catch{toast('JSON faylni o‘qib bo‘lmadi.')}}
 async function aiRegenerate(id){const w=S.words.find(x=>x.id===id);if(!w)return;toast('AI misollar tayyorlanmoqda…');try{w.examples={...w.examples,...await aiExamples(w.word,w.translation)};save();render();toast('Misollar yangilandi.')}catch(e){console.warn(e);toast('Groq API kalitini tekshiring yoki qayta kiriting.')}}
