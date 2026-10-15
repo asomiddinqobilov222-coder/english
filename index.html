@@ -27,10 +27,10 @@ function loadLocalState(){
 }
 let S=loadLocalState();
 let groqApiKey='';
-const AI_KEY_DEVICE_STORAGE='english-soz-groq-key:device';
-function aiKeyStorageName(){const u=cloud?.user;const identity=u?.sub||u?.email;return identity?'english-soz-groq-key:'+String(identity).toLowerCase():AI_KEY_DEVICE_STORAGE}
-function restoreAiKeyForCurrentProfile(){try{const identity=cloud?.user?.sub||cloud?.user?.email;if(identity){const keyName=aiKeyStorageName();let saved=localStorage.getItem(keyName);if(!saved){const deviceKey=localStorage.getItem(AI_KEY_DEVICE_STORAGE);if(deviceKey){saved=deviceKey;localStorage.setItem(keyName,deviceKey);localStorage.removeItem(AI_KEY_DEVICE_STORAGE)}}groqApiKey=saved||''}else groqApiKey=localStorage.getItem(AI_KEY_DEVICE_STORAGE)||''}catch{groqApiKey=''}}
-function persistAiKey(key){try{localStorage.setItem(aiKeyStorageName(),key)}catch{toast('Kalit bu qurilmada saqlanmadi. Brauzer xotirasiga ruxsat bering.')}}
+// Static PWA ichida API kalitini xavfsiz saqlashning backend'i yo'q.
+// Shuning uchun kalit faqat xotirada qoladi: GitHub, Drive yoki browser storage'ga yozilmaydi.
+function restoreAiKeyForCurrentProfile(){groqApiKey=''}
+function persistAiKey(key){groqApiKey=String(key||'')}
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
 saveLocal();
