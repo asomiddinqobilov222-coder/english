@@ -13,6 +13,16 @@ const cloud = {
 };
 
 const CLOUD_LINKED_KEY = "eng-cloud-linked";
+const CLOUD_PROFILE_KEY = "eng-cloud-profile";
+try {
+  const remembered = JSON.parse(localStorage.getItem(CLOUD_PROFILE_KEY) || "null");
+  if (remembered && remembered.email) cloud.user = remembered;
+} catch {}
+function cloudRememberProfile(user) {
+  cloud.user = user;
+  try { if (user && user.email) localStorage.setItem(CLOUD_PROFILE_KEY, JSON.stringify(user)); } catch {}
+  if (typeof restoreAiKeyForCurrentProfile === "function") restoreAiKeyForCurrentProfile();
+}
 
 
 /* ---------------------------------------------------------
@@ -117,6 +127,8 @@ function cloudAutoLogin() {
   if (cloud.autoLoginTried) {
     return;
   }
+  // Retry only an account previously connected by the user.
+  if (localStorage.getItem(CLOUD_LINKED_KEY) !== "1" || !cloud.user) return;
 
   cloud.autoLoginTried = true;
 
@@ -186,25 +198,11 @@ function cloudAutoLogin() {
 
 
 function cloudRenderAutoLoginFailed() {
-
-  const status =
-    document.getElementById("cloud-status");
-
-  const actions =
-    document.getElementById("cloud-actions");
-
-  if (!status || !actions) {
-    return;
-  }
-
-  status.textContent =
-    "Google Drive ulanishini tasdiqlash kerak";
-
-  actions.innerHTML =
-    '<button onclick="cloudLogin()" ' +
-    'style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">' +
-    '🔐 Google orqali kirish' +
-    '</button>';
+  const status = document.getElementById("cloud-status");
+  const actions = document.getElementById("cloud-actions");
+  if (!status || !actions) return;
+  status.textContent = "Profil saqlangan. Drive ruxsati yangilanishi kerak.";
+  actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">☁️ Drive’ni qayta ulash</button> <button onclick="cloudLogout()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer;">Chiqish</button>';
 }
 
 
@@ -224,7 +222,7 @@ async function cloudLoadUser() {
     "https://www.googleapis.com/oauth2/v3/userinfo"
   );
 
-  cloud.user = await response.json();
+  cloudRememberProfile(await response.json());
 }
 
 
@@ -488,6 +486,7 @@ function cloudLogout() {
 
   cloud.token = null;
   cloud.user = null;
+  try { localStorage.removeItem(CLOUD_PROFILE_KEY); } catch {}
   cloud.fileId = null;
   cloud.ready = false;
   S = defaults();
@@ -602,14 +601,11 @@ function cloudRender() {
 
 
   if (cloud.saving) {
-
-    status.textContent =
-      "☁️ Google Drive'ga saqlanmoqda...";
-
+    status.textContent = "☁️ Google Drive'ga saqlanmoqda...";
+  } else if (cloud.ready && cloud.token) {
+    status.textContent = "☁️ Google Drive ulangan";
   } else {
-
-    status.textContent =
-      "☁️ Google Drive ulangan";
+    status.textContent = "Profil eslab qolingan — Drive’ni qayta ulash kerak";
   }
 
 
@@ -627,43 +623,13 @@ function cloudRender() {
 
 
   actions.innerHTML = `
-
-    <div style="
-      display:flex;
-      align-items:center;
-      gap:10px;
-    ">
-
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${picture}
-
-      <div style="font-size:13px;">
-        ${cloud.user.name || ""}
-      </div>
-
-      <button
-        onclick="cloudUpload()"
-        style="
-          padding:8px 10px;
-          border:0;
-          border-radius:10px;
-          cursor:pointer;
-        "
-      >
-        ☁️
-      </button>
-
-      <button
-        onclick="cloudLogout()"
-        style="
-          padding:8px 10px;
-          border:0;
-          border-radius:10px;
-          cursor:pointer;
-        "
-      >
-        Chiqish
-      </button>
-
+      <div style="font-size:13px;flex:1;min-width:90px">${cloud.user.name || cloud.user.email || ""}</div>
+      ${cloud.ready && cloud.token
+        ? '<button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Saqlash</button>'
+        : '<button onclick="cloudLogin()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Drive’ni ulash</button>'}
+      <button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button>
     </div>
   `;
 }
