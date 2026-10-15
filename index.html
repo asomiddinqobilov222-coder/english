@@ -105,10 +105,10 @@ function aiModelFromList(provider,data){
  const ids=(Array.isArray(data?.data)?data.data:Array.isArray(data?.models)?data.models:[]).map(x=>String(x?.id||x?.name||'')).filter(Boolean);
  if(provider==='xai'){
   for(const preferred of ['grok-4.7','grok-4.1','grok-4.1-fast','grok-3-mini','latest'])if(ids.includes(preferred))return preferred;
-  return ids.find(id=>/grok/i.test(id)&&!/image|voice|embed|video|realtime/i.test(id))||'grok-4.7';
+  return ids.find(id=>/grok|latest/i.test(id)&&!/image|voice|embed|video|realtime/i.test(id))||'';
  }
  for(const preferred of ['llama-3.3-70b-versatile','openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.1-8b-instant','qwen/qwen3.8-27b'])if(ids.includes(preferred))return preferred;
- return ids.find(id=>/(llama|gpt-oss|qwen)/i.test(id)&&!/whisper|guard|embed|speech|tts|vision/i.test(id))||ids.find(id=>!/(whisper|guard|embed|speech|tts|image|audio)/i.test(id))||'llama-3.3-70b-versatile';
+ return ids.find(id=>/(llama|gpt-oss|qwen)/i.test(id)&&!/whisper|guard|embed|speech|tts|vision/i.test(id))||ids.find(id=>!/(whisper|guard|embed|speech|tts|image|audio)/i.test(id))||'';
 }
 async function testAiProvider(key,provider){
  const data=await aiFetch(aiBase(provider)+'/models',{headers:{Authorization:'Bearer '+key}},15000),model=aiModelFromList(provider,data);
@@ -124,8 +124,11 @@ async function saveAiKey(){
   let provider=/^xai-/i.test(key)?'xai':/^gsk_/i.test(key)?'groq':'',model='';
   if(provider)model=await testAiProvider(key,provider);
   else{try{provider='xai';model=await testAiProvider(key,provider)}catch(first){provider='groq';try{model=await testAiProvider(key,provider)}catch(second){throw new Error('Kalit Grok (xAI) yoki Groq API kaliti sifatida tekshirilmadi. '+(second.message||first.message))}}}
-  persistAiKey(key,provider,model);toast('✓ '+(provider==='xai'?'Grok (xAI)':'Groq')+' API ulandi. Model: '+model);render();
- }catch(e){aiLastError=e?.message||'Noma’lum xato';console.warn('AI key validation failed:',aiLastError);toast('AI ulanmadi: '+aiLastError.slice(0,100));if(btn){btn.disabled=false;btn.textContent='Ulash va tekshirish'}}
+  persistAiKey(key,provider,model);
+  // /models muvaffaqiyati yetarli emas: haqiqiy chat so‘rovini ham sinab ko‘ramiz.
+  await aiExamples('curious','qiziquvchan');
+  toast('✓ '+(provider==='xai'?'Grok (xAI)':'Groq')+' gap tuzish sinovidan o‘tdi. Model: '+model);render();
+ }catch(e){aiLastError=e?.message||'Noma’lum xato';console.warn('AI key validation failed:',aiLastError);groqApiKey='';aiProvider='';aiModel='';toast('AI gap tuzish sinovidan o‘tmadi: '+aiLastError.slice(0,150));if(btn){btn.disabled=false;btn.textContent='Ulash va tekshirish'}const err=$('#ai-key-error');if(err)err.textContent='Sinov muvaffaqiyatsiz: '+aiLastError}
 }
 function clearAiKey(){groqApiKey='';aiProvider='';aiModel='';aiLastError='';toast('AI API kaliti joriy sahifa xotirasidan o‘chirildi.');render()}
 function parseExamples(raw){
@@ -148,7 +151,7 @@ async function aiExamples(word,translation){
  const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'llama-3.3-70b-versatile'),messages:[
   {role:'system',content:'You are a precise English teacher for Uzbek-speaking learners. Create short, grammatically correct example sentences and accurate natural Uzbek translations. Output valid JSON only. Translate each complete sentence, not just the vocabulary word.'},
   {role:'user',content:prompt}
- ],temperature:0.3,max_tokens:700,response_format:{type:'json_object'}};
+ ],temperature:0.3,max_tokens:1400,response_format:{type:'json_object'}};
  const opts={method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey}};
  let data;
  try{data=await aiFetch(aiBase(aiProvider)+'/chat/completions',{...opts,body:JSON.stringify(payload)},25000)}
