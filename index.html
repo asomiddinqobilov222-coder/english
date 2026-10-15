@@ -153,9 +153,36 @@ async function aiExamples(word,translation){
   {role:'user',content:prompt}
  ],temperature:0.3,max_tokens:1400,response_format:{type:'json_object'}};
  const opts={method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey}};
- let data;
- try{data=await aiFetch(aiBase(aiProvider)+'/chat/completions',{...opts,body:JSON.stringify(payload)},25000)}
- catch(e){if(!/400|response.?format|json.?object|unsupported/i.test(e.message||''))throw e;const retry={...payload};delete retry.response_format;data=await aiFetch(aiBase(aiProvider)+'/chat/completions',{...opts,body:JSON.stringify(retry)},25000)}
+ async function requestWithFormatFallback(model){
+  const body={...payload,model};
+  try{return await aiFetch(aiBase(aiProvider)+'/chat/completions',{...opts,body:JSON.stringify(body)},25000)}
+  catch(e){
+   if(!/400|response.?format|json.?object|unsupported/i.test(e.message||''))throw e;
+   delete body.response_format;
+   return await aiFetch(aiBase(aiProvider)+'/chat/completions',{...opts,body:JSON.stringify(body)},25000);
+  }
+ }
+ let data,selectedModel=payload.model;
+ try{data=await requestWithFormatFallback(selectedModel)}
+ catch(e){
+  const message=String(e?.message||'');
+  if(aiProvider!=='groq'||!(/403/.test(message)&&/(blocked|project level|not allowed|permission)/i.test(message)))throw e;
+  // Groq can list models that a project is not allowed to use. Try other listed text models automatically.
+  const listing=await aiFetch(aiBase(aiProvider)+'/models',{headers:{Authorization:'Bearer '+groqApiKey}},15000);
+  const ids=(Array.isArray(listing?.data)?listing.data:[]).map(x=>String(x?.id||'')).filter(id=>id&&id!==selectedModel&&!/(whisper|guard|embed|speech|tts|vision|image|audio)/i.test(id));
+  const preferred=['llama-3.3-70b-versatile','llama-3.1-8b-instant','openai/gpt-oss-20b','qwen/qwen3.8-27b'];
+  const candidates=[...preferred.filter(id=>ids.includes(id)),...ids.filter(id=>!preferred.includes(id))].slice(0,5);
+  let lastError=e,success=false;
+  for(const candidate of candidates){
+   try{data=await requestWithFormatFallback(candidate);selectedModel=candidate;success=true;break}
+   catch(nextError){
+    lastError=nextError;
+    if(!(/403/.test(String(nextError?.message||''))&&/(blocked|project level|not allowed|permission)/i.test(String(nextError?.message||''))))throw nextError;
+   }
+  }
+  if(!success)throw new Error('Groq loyihasida sinab ko‘rilgan modellar bloklangan. Groq Console → project/model permissions sozlamalarini tekshiring. Oxirgi xato: '+String(lastError?.message||'noma’lum').slice(0,180));
+ }
+ if(selectedModel!==aiModel){aiModel=selectedModel;console.info('AI model avtomatik almashtirildi:',selectedModel)}
  const raw=data?.choices?.[0]?.message?.content;if(!raw)throw new Error('AI bo‘sh javob qaytardi. Model yoki limitni tekshiring.');
  return parseExamples(raw);
 }
