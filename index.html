@@ -163,7 +163,7 @@ function aiModelFromList(provider,data){
  }
  for(const preferred of ['qwen/qwen3.8-27b','openai/gpt-oss-20b'])if(ids.includes(preferred))return preferred;
  // Do not automatically select gpt-oss-120b: it was blocked in this user's Groq project.
- return ids.find(id=>/(llama|gpt-oss|qwen)/i.test(id)&&id!=='openai/gpt-oss-120b'&&!/whisper|guard|embed|speech|tts|vision/i.test(id))||ids.find(id=>id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|image|audio)/i.test(id))||'';
+ return ids.find(id=>/(qwen|gpt-oss|llama)/i.test(id)&&id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video)/i.test(id))||'';
 }
 async function testAiProvider(key,provider){
  const data=await aiFetch(aiBase(provider)+'/models',{headers:{Authorization:'Bearer '+key}},15000),model=aiModelFromList(provider,data);
@@ -225,7 +225,7 @@ async function aiExamples(word,translation){
   if(aiProvider!=='groq'||!modelAccessError(message))throw e;
   // Groq can list models that a project is not allowed to use. Try other listed text models automatically.
   const listing=await aiFetch(aiBase(aiProvider)+'/models',{headers:{Authorization:'Bearer '+groqApiKey}},15000);
-  const ids=(Array.isArray(listing?.data)?listing.data:[]).map(x=>String(x?.id||'')).filter(id=>id&&id!==selectedModel&&id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio)/i.test(id));
+  const ids=(Array.isArray(listing?.data)?listing.data:[]).map(x=>String(x?.id||'')).filter(id=>id&&id!==selectedModel&&id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video)/i.test(id));
   const preferred=['qwen/qwen3.8-27b','openai/gpt-oss-20b'];
   const candidates=[...preferred.filter(id=>ids.includes(id)),...ids.filter(id=>!preferred.includes(id))].slice(0,5);
   let lastError=e,success=false;
