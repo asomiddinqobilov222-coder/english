@@ -221,7 +221,7 @@ async function aiExamples(word,translation){
  try{data=await requestWithFormatFallback(selectedModel)}
  catch(e){
   const message=String(e?.message||'');
-  const modelAccessError=(msg)=>((/403/.test(msg)&&/(blocked|project level|not allowed|permission)/i.test(msg))||(/400/.test(msg)&&/(model.*(not found|unknown|unavailable|deprecated)|unknown model|model_not_found|invalid.*(parameter|value)|unsupported|not supported|temperature|token/i.test(msg)));
+  const modelAccessError=(msg)=>((/403/.test(msg)&&/(blocked|project level|not allowed|permission)/i.test(msg))||(/400/.test(msg)&&/(model.*(not found|unknown|unavailable|deprecated)|unknown model|model_not_found|invalid.*(parameter|value)|unsupported|not supported|temperature|token)/i.test(msg)));
   if(aiProvider!=='groq'||!modelAccessError(message))throw e;
   // Groq can list models that a project is not allowed to use. Try other listed text models automatically.
   const listing=await aiFetch(aiBase(aiProvider)+'/models',{headers:{Authorization:'Bearer '+groqApiKey}},15000);
