@@ -161,7 +161,7 @@ function aiModelFromList(provider,data){
   for(const preferred of ['grok-4.7','grok-4.1','grok-4.1-fast','grok-3-mini','latest'])if(ids.includes(preferred))return preferred;
   return ids.find(id=>/grok|latest/i.test(id)&&!/image|voice|embed|video|realtime/i.test(id))||'';
  }
- for(const preferred of ['llama-3.3-70b-versatile','llama-3.1-8b-instant','openai/gpt-oss-20b','qwen/qwen3.8-27b'])if(ids.includes(preferred))return preferred;
+ for(const preferred of ['qwen/qwen3.8-27b','openai/gpt-oss-20b'])if(ids.includes(preferred))return preferred;
  // Do not automatically select gpt-oss-120b: it was blocked in this user's Groq project.
  return ids.find(id=>/(llama|gpt-oss|qwen)/i.test(id)&&id!=='openai/gpt-oss-120b'&&!/whisper|guard|embed|speech|tts|vision/i.test(id))||ids.find(id=>id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|image|audio)/i.test(id))||'';
 }
@@ -203,7 +203,7 @@ async function aiExamples(word,translation){
  const safeWord=String(word||'').trim(),safeTranslation=String(translation||'').trim();
  if(!safeWord||!safeTranslation)throw new Error('So‘z yoki o‘zbekcha tarjima bo‘sh.');
  const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must use the target word or a natural inflected form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural Uzbek translation of the whole sentence. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Uzbek translation"},"normal":{"en":"English sentence","uz":"Uzbek translation"},"hard":{"en":"English sentence","uz":"Uzbek translation"}}}. No markdown, no extra text.';
- const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'llama-3.3-70b-versatile'),messages:[
+ const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b'),messages:[
   {role:'system',content:'You are a precise English teacher for Uzbek-speaking learners. Create short, grammatically correct example sentences and accurate natural Uzbek translations. Output valid JSON only. Translate each complete sentence, not just the vocabulary word.'},
   {role:'user',content:prompt}
  ],temperature:0.3,max_tokens:1400,response_format:{type:'json_object'}};
@@ -221,18 +221,19 @@ async function aiExamples(word,translation){
  try{data=await requestWithFormatFallback(selectedModel)}
  catch(e){
   const message=String(e?.message||'');
-  if(aiProvider!=='groq'||!(/403/.test(message)&&/(blocked|project level|not allowed|permission)/i.test(message)))throw e;
+  const modelAccessError=(msg)=>((/403/.test(msg)&&/(blocked|project level|not allowed|permission)/i.test(msg))||(/400/.test(msg)&&/(model.*(not found|unknown|unavailable|deprecated)|unknown model|model_not_found)/i.test(msg)));
+  if(aiProvider!=='groq'||!modelAccessError(message))throw e;
   // Groq can list models that a project is not allowed to use. Try other listed text models automatically.
   const listing=await aiFetch(aiBase(aiProvider)+'/models',{headers:{Authorization:'Bearer '+groqApiKey}},15000);
   const ids=(Array.isArray(listing?.data)?listing.data:[]).map(x=>String(x?.id||'')).filter(id=>id&&id!==selectedModel&&id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio)/i.test(id));
-  const preferred=['llama-3.3-70b-versatile','llama-3.1-8b-instant','openai/gpt-oss-20b','qwen/qwen3.8-27b'];
+  const preferred=['qwen/qwen3.8-27b','openai/gpt-oss-20b'];
   const candidates=[...preferred.filter(id=>ids.includes(id)),...ids.filter(id=>!preferred.includes(id))].slice(0,5);
   let lastError=e,success=false;
   for(const candidate of candidates){
    try{data=await requestWithFormatFallback(candidate);selectedModel=candidate;success=true;break}
    catch(nextError){
     lastError=nextError;
-    if(!(/403/.test(String(nextError?.message||''))&&/(blocked|project level|not allowed|permission)/i.test(String(nextError?.message||''))))throw nextError;
+    if(!modelAccessError(String(nextError?.message||'')))throw nextError;
    }
   }
   if(!success)throw new Error('Groq loyihasida sinab ko‘rilgan modellar bloklangan. Groq Console → project/model permissions sozlamalarini tekshiring. Oxirgi xato: '+String(lastError?.message||'noma’lum').slice(0,180));
