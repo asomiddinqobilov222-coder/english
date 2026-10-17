@@ -117,9 +117,11 @@ async function checkLiveSpelling(value,fullText){
   const list=await response.json();
   if(!current())return;
   if(list.some(x=>String(x.word||'').toLowerCase()===value.toLowerCase())){hideNotice();return}
-  const candidate=list.map(x=>({word:x.word,d:wordEditDistance(value,x.word)})
-   ).filter(x=>x.word.toLowerCase()!==value.toLowerCase()&&x.d>0&&x.d<=Math.min(2,value.length>=8?2:1)&&/^[a-z]+(?:['-][a-z]+)*$/i.test(x.word))
-   .sort((a,b)=>a.d-b.d)[0];
+  const candidate=list.map(x=>({word:String(x.word||''),d:wordEditDistance(value,x.word),score:Number(x.score)||0}))
+   .filter(x=>x.word&&x.word.toLowerCase()!==value.toLowerCase()&&x.d>0&&x.d<=Math.min(2,value.length>=7?2:1)&&/^[a-z]+(?:['-][a-z]+)*$/i.test(x.word))
+   // Bir xil tahrir masofasida kam ishlatiladigan yoki qisqaroq tasodifiy so‘zdan ko‘ra,
+   // Datamuse bergan ko‘proq uchraydigan so‘zni tanlaymiz.
+   .sort((a,b)=>a.d-b.d||b.score-a.score||b.word.length-a.word.length)[0];
   if(!candidate){hideNotice();return}
   box.className='spell-live show';
   box.innerHTML='<strong>⚠️ Imlo xatosi bo‘lishi mumkin:</strong> <span>'+esc(value)+'</span> → <strong>'+esc(candidate.word)+'</strong> <button type="button" id="spell-live-fix">Tuzatish</button>';
