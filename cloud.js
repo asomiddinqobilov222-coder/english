@@ -94,7 +94,7 @@ async function cloudAuthorizedFetch(url, options = {}) {
   let response = await send();
   if (response.status === 401) {
     try {
-      await cloudRequestAccessToken("");
+      await cloudRequestAccessToken("none");
       response = await send();
     } catch (error) {
       cloud.needsAuthorization = true;
@@ -284,8 +284,9 @@ function cloudAutoLogin() {
     }
   });
 
+  // Attempt silent token acquisition on page load; browsers may block popups without a user gesture.
   client.requestAccessToken({
-    prompt: ""
+    prompt: "none"
   });
 }
 
