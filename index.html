@@ -180,7 +180,7 @@ function aiModelFromList(provider,data){
  const preferred=['qwen/qwen3.8-27b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant','groq/compound','groq/compound-mini'];
  for(const id of preferred)if(ids.includes(id))return id;
  // Audio generation and prompt-guard models cannot create the app's text answers.
- return ids.find(id=>!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video|transcri|diariz)/i.test(id))||'';
+ return ids.find(id=>id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video|transcri|diariz)/i.test(id))||'';
 }
 async function testAiProvider(key,provider){
  const data=await aiFetch(aiBase(provider)+'/models',{headers:{Authorization:'Bearer '+key}},15000),model=aiModelFromList(provider,data);
