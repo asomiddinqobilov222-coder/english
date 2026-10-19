@@ -10,6 +10,8 @@ const cloud = {
   saving: false,
   pendingSave: false,
   lastError: "",
+  needsAuthorization: false,
+  refreshingToken: null,
   preserveCurrentIfMissing: false,
   saveTimer: null,
   autoLoginTried: false
@@ -45,26 +47,76 @@ function cloudRememberProfile(user) {
    1. Google API orqali so'rov yuborish
    --------------------------------------------------------- */
 
+async function cloudRequestAccessToken(prompt = "") {
+  if (cloud.refreshingToken) return cloud.refreshingToken;
+  if (typeof google === "undefined" || !google.accounts?.oauth2) {
+    throw new Error("Google ruxsat xizmati yuklanmagan.");
+  }
+  cloud.refreshingToken = new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const timer = setTimeout(() => finish(reject, new Error("Google Drive ruxsatini avtomatik yangilab bo‘lmadi. Profil ichidagi Drive’ni ulash tugmasini bosing.")), 15000);
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "openid email profile https://www.googleapis.com/auth/drive.file",
+        callback: response => {
+          if (response?.error || !response?.access_token) {
+            finish(reject, new Error("Google Drive ruxsati yangilanishi kerak. Profil ichidagi Drive’ni ulash tugmasini bosing."));
+            return;
+          }
+          cloud.token = response.access_token;
+          cloud.needsAuthorization = false;
+          cloud.lastError = "";
+          finish(resolve, response.access_token);
+        },
+        error_callback: error => finish(reject, new Error(error?.message || "Google ruxsat oynasi ochilmadi. Drive’ni qo‘lda ulang."))
+      });
+      client.requestAccessToken({prompt});
+    } catch (error) {
+      finish(reject, error);
+    }
+  }).finally(() => { cloud.refreshingToken = null; });
+  return cloud.refreshingToken;
+}
+
+async function cloudAuthorizedFetch(url, options = {}) {
+  const send = () => {
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", "Bearer " + (cloud.token || ""));
+    return fetch(url, {...options, headers});
+  };
+  let response = await send();
+  if (response.status === 401) {
+    try {
+      await cloudRequestAccessToken("");
+      response = await send();
+    } catch (error) {
+      cloud.needsAuthorization = true;
+      cloud.lastError = error?.message || "Google Drive ruxsati yangilanishi kerak.";
+      throw new Error(cloud.lastError);
+    }
+  }
+  if (!response.ok) {
+    const detail = await response.text();
+    if (response.status === 401) cloud.needsAuthorization = true;
+    throw new Error(detail || ("Google API HTTP " + response.status));
+  }
+  cloud.needsAuthorization = false;
+  return response;
+}
+
 async function cloudApi(url, options = {}) {
   const headers = new Headers(options.headers || {});
-
-  headers.set("Authorization", "Bearer " + cloud.token);
-
-  if (options.body && !(options.body instanceof Blob)) {
+  if (options.body && !(options.body instanceof Blob) && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Google API xatosi");
-  }
-
-  return response;
+  return cloudAuthorizedFetch(url, {...options, headers});
 }
 
 
@@ -102,6 +154,7 @@ function cloudLogin() {
 
       cloud.token = response.access_token;
       cloud.lastError = "";
+      cloud.needsAuthorization = false;
 
       try {
         await cloudLoadUser();
@@ -192,6 +245,8 @@ function cloudAutoLogin() {
           "Automatic Google login:",
           response
         );
+        cloud.needsAuthorization = true;
+        cloud.lastError = "Google Drive ruxsatini qayta olish kerak.";
 
         cloudRenderAutoLoginFailed();
 
@@ -200,6 +255,7 @@ function cloudAutoLogin() {
 
       cloud.token = response.access_token;
       cloud.lastError = "";
+      cloud.needsAuthorization = false;
       cloud.preserveCurrentIfMissing = true;
 
       try {
@@ -219,6 +275,7 @@ function cloudAutoLogin() {
 
         cloud.token = null;
         cloud.ready = false;
+        cloud.needsAuthorization = true;
         cloud.preserveCurrentIfMissing = false;
         cloud.lastError = error?.message || "Noma'lum xato";
 
@@ -376,25 +433,10 @@ async function cloudCreateFile() {
     )
   );
 
-  const response = await fetch(
+  const response = await cloudAuthorizedFetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
-    {
-      method: "POST",
-
-      headers: {
-        Authorization:
-          "Bearer " + cloud.token
-      },
-
-      body: form
-    }
+    {method: "POST", body: form}
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await response.text()
-    );
-  }
 
   const data = await response.json();
 
@@ -413,30 +455,10 @@ async function cloudUpdateFile() {
     return;
   }
 
-  const response = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files/" +
-    cloud.fileId +
-    "?uploadType=media",
-    {
-      method: "PATCH",
-
-      headers: {
-        Authorization:
-          "Bearer " + cloud.token,
-
-        "Content-Type":
-          "application/json"
-      },
-
-      body: JSON.stringify(S)
-    }
+  const response = await cloudAuthorizedFetch(
+    "https://www.googleapis.com/upload/drive/v3/files/" + cloud.fileId + "?uploadType=media",
+    {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify(S)}
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await response.text()
-    );
-  }
 }
 
 
@@ -525,6 +547,7 @@ async function cloudLogout() {
   cloud.user = null;
   cloud.fileId = null;
   cloud.ready = false;
+  cloud.needsAuthorization = false;
   cloud.saving = false;
   cloud.pendingSave = false;
   cloud.lastError = "";
@@ -639,7 +662,9 @@ function cloudRender() {
   }
 
 
-  if (cloud.saving) {
+  if (cloud.needsAuthorization) {
+    status.textContent = "Profil saqlangan. Drive ruxsatini yangilash kerak; ilovadan chiqilmadi.";
+  } else if (cloud.saving) {
     status.textContent = "☁️ Google Drive'ga saqlanmoqda...";
   } else if (cloud.lastError && cloud.ready && cloud.token) {
     status.textContent = "⚠️ Saqlash xatosi. Qayta saqlash tugmasini bosing.";
@@ -667,9 +692,9 @@ function cloudRender() {
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${picture}
       <div style="font-size:13px;flex:1;min-width:90px">${cloud.user.name || cloud.user.email || ""}</div>
-      ${cloud.ready && cloud.token
+      ${cloud.ready && cloud.token && !cloud.needsAuthorization
         ? '<button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Saqlash / qayta urinish</button>'
-        : '<button onclick="cloudLogin()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Drive’ni ulash</button>'}
+        : '<button onclick="cloudLogin()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Drive’ni ulash / ruxsatni yangilash</button>'}
       <button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button>
     </div>
   `;
