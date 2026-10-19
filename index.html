@@ -283,12 +283,25 @@ async function aiGradeSentence(answer,target,word){
   {role:'system',content:'Grade an Uzbek learner\'s English translation fairly. Accept natural synonyms and equivalent grammar. Judge meaning, grammar, and word choice; do not demand exact wording. Return JSON only: {"score":0,"corrected":"correct natural English","errors":["short error"],"feedback":"brief Uzbek note"}. score is integer 0-100. If correct, errors=[] and corrected may repeat the learner answer. Keep every text field very short. No detailed explanation.'},
   {role:'user',content:'Target: '+JSON.stringify(target)+'\nVocabulary word: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+'\nReturn the score, corrected sentence, and only the main errors.'}
  ];
- const payload={model,messages,max_completion_tokens:220};
+ const payload={model,messages,max_completion_tokens:420};
  if(/^qwen\/qwen3\./i.test(model)){payload.reasoning_effort='none';payload.temperature=0.1}
  else if(!/gpt-oss/i.test(model))payload.temperature=0.1;
- const data=await aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(payload)},25000);
- const raw=String(data?.choices?.[0]?.message?.content||'').trim();
- if(!raw)throw new Error('AI bo‘sh baho qaytardi.');
+ const requestGrade=()=>aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(payload)},25000);
+ let data=await requestGrade();
+ let choice=data?.choices?.[0],raw=String(choice?.message?.content||'').trim();
+ // Some reasoning models can consume a small output budget before emitting the JSON.
+ // Retry once only when the provider returned no visible content; do not retry ordinary grading errors.
+ if(!raw){
+  console.warn('AI grade returned empty content:',{model,finish_reason:choice?.finish_reason,usage:data?.usage});
+  payload.max_completion_tokens=650;
+  data=await requestGrade();
+  choice=data?.choices?.[0];
+  raw=String(choice?.message?.content||'').trim();
+ }
+ if(!raw){
+  const reason=String(choice?.finish_reason||'unknown');
+  throw new Error('AI matnli baho qaytarmadi (finish_reason: '+reason+'). Bir marta avtomatik qayta urinildi; keyinroq qayta urinib ko‘ring.');
+ }
  const first=raw.indexOf('{'),last=raw.lastIndexOf('}');
  if(first<0||last<=first)throw new Error('AI bahosining formati noto‘g‘ri. Qayta urinib ko‘ring.');
  const parsed=JSON.parse(raw.slice(first,last+1));
