@@ -276,7 +276,45 @@ function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').repla
 function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Mashq yakunlandi.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel"><div class="eyebrow">GAP TUZISH · AI AGENT</div><h3 class="section-title">${loading?'Gap tayyorlanmoqda…':failed?'Gapni tayyorlab bo‘lmadi':'AI agent gap tayyorlaydi'}</h3><p class="subhead">${loading?'Groq AI so‘z uchun o‘zbekcha gap va uning inglizcha tarjimasini tayyorlamoqda.':failed?('AI xatosi: '+esc(aiLastError||'Kalit, internet yoki API limitini tekshiring.')):'Gap rejimi uchun tayyor misol topilmadi. Agent avtomatik ravishda yangisini yaratadi.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Qayta urinish</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profil va API kaliti</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Iltimos, bir oz kuting.':'So‘z uchun yangi gap tuzilmoqda.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel"><div class="eyebrow">GAP TUZISH · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Asosiy so‘z: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Tekshirish</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
 async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
 function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
-function checkSentence(){const input=$('#sentence-answer'),val=input?.value.trim();if(!val)return toast('Javobni yozing.');const w=sentence.items[0],level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en){sentence.miss.add(w.id);sentence.items.shift();sentence.index++;if(!sentence.items.length)finishTask('sentence',sentence.correct,sentence.all.length,sentence.miss);else render();return}const a=norm(val),b=norm(ex.en);const score=a===b?100:wordOverlap(a,b);if(score>=.72)sentence.correct++;else sentence.miss.add(w.id);sentence.feedback=`${score>=.72?'✓ Yaxshi!':'To‘g‘ri javob:'} ${ex.en}`;$('#sentence-feedback').textContent=sentence.feedback;const next=$('.panel form button');if(next){next.textContent='Keyingi gap →';next.onclick=e=>{e.preventDefault();sentence.items.shift();sentence.index++;if(!sentence.items.length)finishTask('sentence',sentence.correct,sentence.all.length,sentence.miss);else render()}}haptic(score>=.72)}
+async function aiGradeSentence(answer,target,word){
+ if(!groqApiKey||!aiProvider)throw new Error('Profil bo‘limida Groq API kalitini ulang.');
+ const model=aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b');
+ const messages=[
+  {role:'system',content:'You are a fair English teacher grading an English translation written by an Uzbek learner. Accept natural synonyms and equivalent grammatical structures. Penalize meaning-changing errors, but do not require exact wording. Return JSON only: {"score":0,"feedback":"short Uzbek feedback"}. Score is an integer from 0 to 100. Be consistent: 70 means the core meaning is communicated correctly with only minor errors.'},
+  {role:'user',content:'Target English sentence: '+JSON.stringify(target)+'\nVocabulary target: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+'\nGrade meaning, grammar, and word choice. Return JSON only.'}
+ ];
+ const payload={model,messages,max_completion_tokens:500};
+ if(/^qwen\/qwen3\./i.test(model)){payload.reasoning_effort='none';payload.temperature=0.1}
+ else if(!/gpt-oss/i.test(model))payload.temperature=0.1;
+ const data=await aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(payload)},25000);
+ const raw=String(data?.choices?.[0]?.message?.content||'').trim();
+ if(!raw)throw new Error('AI bo‘sh baho qaytardi.');
+ const first=raw.indexOf('{'),last=raw.lastIndexOf('}');
+ if(first<0||last<=first)throw new Error('AI bahosining formati noto‘g‘ri. Qayta urinib ko‘ring.');
+ const parsed=JSON.parse(raw.slice(first,last+1));
+ let score=Number(parsed.score);
+ if(!Number.isFinite(score))throw new Error('AI bahosi raqamli emas.');
+ if(score>0&&score<=1)score*=100;
+ return {score:Math.max(0,Math.min(100,Math.round(score))),feedback:String(parsed.feedback||parsed.comment||'Javob tekshirildi.').trim()};
+}
+async function checkSentence(){
+ const input=$('#sentence-answer'),val=input?.value.trim();
+ if(!val)return toast('Javobni yozing.');
+ const w=sentence.items[0],level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;
+ if(!ex?.en){toast('Bu so‘z uchun namuna gap yo‘q. AI misollarni qayta yarating.');return}
+ const button=$('.panel form button');
+ if(button?.disabled)return;
+ if(button){button.disabled=true;button.textContent='AI javobni tekshirmoqda…'}
+ let result;
+ try{result=await aiGradeSentence(val,ex.en,w.word)}
+ catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.warn('AI sentence grading failed:',aiLastError);if(button){button.disabled=false;button.textContent='Tekshirish'}toast('AI tekshira olmadi: '+aiLastError.slice(0,140));return}
+ const score=result.score/100,correct=score>=0.70;
+ if(correct)sentence.correct++;else sentence.miss.add(w.id);
+ sentence.feedback=`${correct?'✓ Yaxshi!':'To‘g‘ri javob:'} ${ex.en} · AI: ${result.score}% — ${result.feedback}`;
+ const feedback=$('#sentence-feedback');if(feedback)feedback.textContent=sentence.feedback;
+ if(button){button.disabled=false;button.textContent='Keyingi gap →';button.onclick=e=>{e.preventDefault();sentence.items.shift();sentence.index++;if(!sentence.items.length)finishTask('sentence',sentence.correct,sentence.all.length,sentence.miss);else render()}}
+ haptic(correct)
+}
 function wordOverlap(a,b){const aa=new Set(a.split(' ')),bb=b.split(' ');if(!bb.length)return 0;return bb.filter(x=>aa.has(x)).length/bb.length}
 function finishTask(id,correct,total,miss=new Set()){const p=progressFor();const score=total?Math.round(correct/total*100):0;const pools={flash:flash?.all,match:match?.all,write:write?.all,sentence:sentence?.all};const missed=miss instanceof Set?miss:new Set(miss||[]);if(score>=70){markReviewed(pools[id]||[],missed);p.modes[id]={score,correct,total,at:Date.now()};p.tasks[id]=p.modes[id]}else if(!p.modes[id]||p.modes[id].score<70){delete p.modes[id];delete p.tasks[id]}p.score=Math.round(Object.values(p.modes).reduce((a,x)=>a+(x.score||0),0)/4);S.history[today()]={...(S.history[today()]||{}),[id]:{score,correct,total,passed:score>=70}};save();task=null;page='result';matchState={id,correct,total,score,miss:[...missed],passed:score>=70};render()}
 function resultView(){const r=matchState||{score:0,correct:0,total:0,id:'flash'};const passed=r.score>=70;return `${header(passed?'Mashq yakunlandi':'70% ga yetmadi',passed?'Vazifa bajarilgan deb hisoblandi.':'Vazifa bajarilgan hisoblanmadi — qayta urinib ko‘r.')}<section class="panel task-area"><div class="ring" style="--pct:${r.score}"><b>${r.score}%</b></div><h2 style="margin:8px 0">${passed?(r.score>=90?'Ajoyib natija! 🚀':'Yaxshi ish! 💪'):'Yana bir bor urinib ko‘r 💪'}</h2><p class="subhead">${r.correct} ta to‘g‘ri · ${Math.max(0,r.total-r.correct)} ta xato · ${r.total} ta savol</p><p class="subhead">${passed?'✓ Bugungi vazifa bajarildi.':'Kamida 70% natija kerak. Bu urinish kunlik vazifa sifatida saqlanmadi.'}</p><div style="margin-top:20px" class="stack"><button class="btn primary full" onclick="startTask('${r.id}')">${passed?'Bugungi mashqni yana bajarish':'Qayta bajarish'}</button><button class="btn secondary full" onclick="go('tasks')">Boshqa vazifa</button><button class="btn ghost full" onclick="go('home')">Asosiy oynaga qaytish</button></div></section>`}
