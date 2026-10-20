@@ -286,23 +286,40 @@ async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w
 function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
 async function aiGradeSentence(answer,target,word){
  if(!groqApiKey||!aiProvider)throw new Error('Profil bo‘limida Groq API kalitini ulang.');
- const model=aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b');
  const messages=[
   {role:'system',content:'Grade an Uzbek learner\'s English translation fairly. Accept natural synonyms and equivalent grammar. Judge meaning, grammar, and word choice; do not demand exact wording. Return JSON only: {"score":0,"corrected":"correct natural English","errors":["short error"],"feedback":"brief Uzbek note"}. score is integer 0-100. If correct, errors=[] and corrected may repeat the learner answer. Keep every text field very short. No detailed explanation.'},
   {role:'user',content:'Target: '+JSON.stringify(target)+'\nVocabulary word: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+'\nReturn the score, corrected sentence, and only the main errors.'}
  ];
- const payload={model,messages,max_completion_tokens:420};
- if(/^qwen\/qwen3\./i.test(model)){payload.reasoning_effort='none';payload.temperature=0.1}
- else if(!/gpt-oss/i.test(model))payload.temperature=0.1;
- const requestGrade=()=>aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(payload)},25000);
- let data=await requestGrade();
+ const initialModel=aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b');
+ const makeGradePayload=(model,maxTokens=420)=>{const p={model,messages,max_completion_tokens:maxTokens};if(/^qwen\/qwen3\./i.test(model)){p.reasoning_effort='none';p.temperature=0.1}else if(!/gpt-oss/i.test(model))p.temperature=0.1;return p};
+ const requestGrade=async(model,maxTokens=420)=>aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(makeGradePayload(model,maxTokens))},25000);
+ let model=initialModel,data;
+ try{data=await requestGrade(model)}
+ catch(firstError){
+  const msg=String(firstError?.message||''),lower=msg.toLowerCase();
+  const canFallback=aiProvider==='groq'&&((lower.includes('403')||lower.includes('forbidden'))&&/(blocked|organization|org level|project level|not allowed|permission|access denied|not authorized)/i.test(lower)||lower.includes('400')&&/(model not found|unknown model|model unavailable|deprecated|model_not_found|invalid parameter|unsupported|not supported|temperature|token)/i.test(lower));
+  if(!canFallback)throw firstError;
+  const listing=await aiFetch(aiBase(aiProvider)+'/models',{headers:{Authorization:'Bearer '+groqApiKey}},15000);
+  const ids=[...new Set((Array.isArray(listing?.data)?listing.data:[]).map(x=>String(x?.id||'')).filter(id=>id&&id!==model&&id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video|transcri|diariz)/i.test(id)))];
+  const preferred=['openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant','groq/compound','groq/compound-mini','qwen/qwen3.8-27b'];
+  const candidates=[...preferred.filter(id=>ids.includes(id)),...ids.filter(id=>!preferred.includes(id))].slice(0,10);
+  let lastError=firstError,success=false;
+  for(const candidate of candidates){
+   try{data=await requestGrade(candidate);model=candidate;success=true;break}
+   catch(nextError){
+    lastError=nextError;const s=String(nextError?.message||'').toLowerCase();
+    const stillAccessError=((s.includes('403')||s.includes('forbidden'))&&/(blocked|organization|org level|project level|not allowed|permission|access denied|not authorized)/i.test(s))||(s.includes('400')&&/(model not found|unknown model|model unavailable|deprecated|model_not_found|invalid parameter|unsupported|not supported|temperature|token)/i.test(s));
+    if(!stillAccessError)throw nextError;
+   }
+  }
+  if(!success)throw new Error('Groq matn modellaridan hech biri ishlamadi. Groq Console → Project → Model Permissions bo‘limida chat modeliga ruxsat bering. Tafsilot: '+String(lastError?.message||'noma’lum').slice(0,140));
+  aiModel=model;persistAiKey(groqApiKey,aiProvider,model);
+ }
  let choice=data?.choices?.[0],raw=String(choice?.message?.content||'').trim();
  // Some reasoning models can consume a small output budget before emitting the JSON.
- // Retry once only when the provider returned no visible content; do not retry ordinary grading errors.
  if(!raw){
   console.warn('AI grade returned empty content:',{model,finish_reason:choice?.finish_reason,usage:data?.usage});
-  payload.max_completion_tokens=650;
-  data=await requestGrade();
+  data=await requestGrade(model,650);
   choice=data?.choices?.[0];
   raw=String(choice?.message?.content||'').trim();
  }
