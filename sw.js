@@ -1,5 +1,5 @@
-const CACHE='english-soz-v27';
-const CORE=['./','./index.html','./cloud.js','./config.js','./manifest.json','./icon-192.png','./icon-512.png'];
+const CACHE='english-soz-v28';
+const CORE=['./','./index.html','./cloud.js','./config.js','./supabase-cloud.js','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
