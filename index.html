@@ -598,4 +598,95 @@ function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'appl
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.words))throw Error('format');const ok=await modal('Ma’lumotni tiklash','<p class="subhead">Joriy lug‘at o‘rniga zaxiradagi ma’lumotlar yuklanadi. Avval eksport qilib qo‘yish tavsiya etiladi.</p>',[{text:'Bekor qilish',value:false},{text:'Tiklash',value:true,primary:true}]);if(!ok)return;S={...defaults(),...data,set:{...defaults().set,...data.set}};S.words=S.words.map(w=>({...w,id:String(w.id||uid()),done:Array.isArray(w.done)?w.done:[],examples:normalizeExamples(w.examples,w.example)}));save();render();toast('Ma’lumot tiklandi.')}catch{toast('JSON faylni o‘qib bo‘lmadi.')}}
 async function aiRegenerate(id){const w=S.words.find(x=>x.id===id);if(!w)return;toast('AI misollar tayyorlanmoqda…');try{w.examples={...w.examples,...await aiExamples(w.word,w.translation)};save();render();toast('Misollar yangilandi.')}catch(e){console.warn(e);toast('Groq API kalitini tekshiring yoki qayta kiriting.')}}
 function init(){progressFor();try{document.body.dataset.theme=localStorage.getItem('english-soz-theme')||'night'}catch{document.body.dataset.theme='night'}render();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn)}init();
-</script></body></html>
+</script>
+<script>
+  'use strict';
+/* Engliwords UI patch: index.html da asosiy <script> dan KEYIN ulanadi */
+(function(){
+const css=`
+.top2{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bigbrand{margin:0;font-size:32px;font-weight:850;letter-spacing:-1.2px}
+.topr{display:flex;align-items:center;gap:8px}
+.topr .theme-toggle span{display:inline!important}
+.streak{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 13px;border:1px solid #ffffff24;border-radius:999px;background:#ffffff12;font-weight:800;font-size:16px;color:var(--text)}
+.streak .flame{display:inline-block;font-size:19px;transform-origin:50% 90%}
+.streak.dying .flame{filter:grayscale(.8) brightness(.75);animation:flame-die 1.3s ease-in-out infinite alternate}
+.streak.dying{opacity:.9}
+@keyframes flame-die{from{transform:scale(.82);opacity:.45}to{transform:scale(1);opacity:.9}}
+body.pg-home{overflow:hidden}
+body.pg-home .app{height:100dvh;padding-bottom:104px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+body.pg-home .app .panel{margin-bottom:0}
+.hp-today .bigt{font-size:20px}
+.hp-today .tl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hp-today .tl .btn{margin-left:auto}
+.barrow{display:flex;align-items:center;gap:12px;margin-top:12px}
+.barrow .bar{flex:1;margin-top:0}
+.addrow{display:flex;align-items:center;justify-content:space-between;font-size:18px;font-weight:800;padding:14px 16px}
+.plus{width:42px;height:42px;border:0;border-radius:13px;font-size:26px;font-weight:800;line-height:1;background:linear-gradient(135deg,var(--cyan),#87f0d4);color:#07171a}
+.hp-prog{flex:1;min-height:0;display:flex;flex-direction:column}
+.hp-prog .section-title{margin:0 0 6px;font-size:18px}
+.hp-prog .chart-wrap{height:auto;flex:1;min-height:0;display:flex;align-items:center}
+.hp-prog .chart-wrap svg{height:auto;max-height:100%}
+.hp-stats{display:flex;gap:18px;margin-top:6px;font-size:14px}
+.choice.selected{background:linear-gradient(135deg,#3b82f0,#7cc4ff)!important;border-color:#cfe8ff!important;color:#fff!important;box-shadow:0 0 0 3px #5aaeff55,0 6px 16px #3b82f055!important;transform:scale(1.03)}
+.ai-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ai-row .field{flex:1}
+`;
+const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+
+applyTheme=function(theme){const n=theme==='day'?'day':'night';document.body.dataset.theme=n;try{localStorage.setItem('english-soz-theme',n)}catch{}const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=n==='day'?'#70c5ff':'#0a1930';document.querySelectorAll('.theme-toggle').forEach(b=>{b.innerHTML=n==='day'?'☀️ <span>Day</span>':'🌙 <span>Night</span>'})};
+ensureThemeToggle=function(){if(page!=='home')document.querySelectorAll('.theme-toggle').forEach(b=>b.remove());applyTheme(document.body.dataset.theme||'night')};
+
+/* 1-6: asosiy oyna */
+home=function(){
+ const p=progressFor(),done=Object.keys(p.modes).length,pct=percentToday(),n=streak();
+ const dying=n>0&&done<4&&new Date().getHours()>=18;
+ return `<div class="top2"><h1 class="bigbrand">Engliwords</h1><div class="topr"><button type="button" class="streak ${dying?'dying':''}" onclick="openCalendar()" aria-label="Kunlik zanjir"><b>${n}</b><span class="flame">🔥</span></button><button type="button" class="theme-toggle" onclick="toggleTheme()"></button></div></div>
+<div class="panel hp-today"><div class="tl"><b class="bigt">Bugun:</b><span class="subhead">${done}/4 vazifa bajarildi</span><button class="btn primary small" onclick="go('tasks')">Davom etamiz</button></div><div class="barrow">${bar(pct)}<span class="percent">${pct}%</span></div></div>
+<div class="panel addrow"><span>So‘z qo‘shish</span><button type="button" class="plus" onclick="go('add')" aria-label="So‘z qo‘shish">+</button></div>
+<section class="panel hp-prog"><h3 class="section-title">progress</h3><div class="chart-wrap">${chart()}</div><div class="hp-stats"><b>So‘zlar: ${S.words.length}</b><b>Bugun: ${dueWords().length}</b></div></section>`};
+
+chart=function(){
+ const now=new Date(),days=[];
+ for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(now.getDate()+chartWindowOffset-i);const k=dateKey(d),v=Object.values(S.progress[k]?.modes||{}).map(x=>Number(x.score)||0);days.push({k,pct:v.length?Math.round(v.reduce((a,b)=>a+b,0)/4):0,label:d.toLocaleDateString('uz-UZ',{weekday:'short'}).replace('.','')})}
+ const W=520,H=185,L=34,R=10,T=10,B=24,iw=W-L-R,ih=H-T-B,X=i=>L+iw*i/6,Y=q=>T+ih*(1-q/100);
+ const grid=[0,25,50,75,100].map(v=>`<g><line x1="${L}" y1="${Y(v)}" x2="${W-R}" y2="${Y(v)}" stroke="currentColor" opacity=".13"/><text x="${L-7}" y="${Y(v)+4}" fill="currentColor" opacity=".65" font-size="10" text-anchor="end">${v}</text></g>`).join('');
+ let seg=[];const segs=[seg];
+ days.forEach((d,i)=>{if(d.pct>0)seg.push(X(i)+','+Y(d.pct));else if(seg.length){seg=[];segs.push(seg)}});
+ const lines=segs.filter(s=>s.length>1).map(s=>`<polyline points="${s.join(' ')}" fill="none" stroke="var(--cyan)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+ const pts=days.map((d,i)=>(d.pct>0?`<circle class="chart-point" tabindex="0" role="button" aria-label="${d.k}: ${d.pct}%" cx="${X(i)}" cy="${Y(d.pct)}" r="5" fill="var(--cyan)" stroke="var(--panel)" stroke-width="2" onclick="showProgressDay('${d.k}',${d.pct})"></circle>`:'')+`<text x="${X(i)}" y="${H-6}" fill="currentColor" opacity=".75" font-size="11" text-anchor="middle">${esc(d.label)}</text>`).join('');
+ return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kunlik progress grafigi">${grid}${lines}${pts}</svg>`};
+
+/* 7: vazifalar */
+const _tasks=tasksPage;
+tasksPage=function(){const d=document.createElement('div');d.innerHTML=_tasks();d.querySelector('.screen-title')?.remove();d.querySelector('.footnote')?.remove();return d.innerHTML};
+
+/* 9: tarjimon */
+const _tr=translatorPage;
+translatorPage=function(){const d=document.createElement('div');d.innerHTML=_tr();d.querySelector('.screen-title')?.remove();const ss=d.querySelectorAll('section');ss[ss.length-1]?.remove();const sel=d.querySelector('p.subhead select');if(sel){const p=sel.parentElement;const html=sel.outerHTML;p.innerHTML=html}return d.innerHTML};
+
+/* 10: o‘zbekchadan inglizchaga ham “Lug‘atga qo‘shish” */
+function trPair(){const s=String(translator.source||'').trim(),r=String(translator.result||'').trim();return translator.sl==='en'?{en:s,uz:r}:{en:r,uz:s}}
+translatorCanAddWord=function(){const {en,uz}=trPair();return /^[A-Za-z][A-Za-z'’-]*$/.test(en)&&uz.length>0&&uz.length<=40&&!/[.!?\n]/.test(uz)&&uz.split(/\s+/).length<=2};
+addTranslatorWord=async function(){
+ if(!translatorCanAddWord())return toast('Faqat bitta so‘zni tarjima qiling.');
+ const {en,uz}=trPair(),exact=S.words.find(w=>w.word.toLowerCase()===en.toLowerCase());
+ if(exact)return toast('“'+exact.word+'” — bu so‘z lug‘atga allaqachon qo‘shilgan.');
+ const w={id:uid(),word:en,translation:uz,added:today(),done:[],examples:{easy:null,normal:null,hard:null}};
+ S.words.push(w);const p=progressFor();if(!p.words.includes(w.id))p.words.push(w.id);save();toast('So‘z lug‘atga qo‘shildi.');render()};
+
+/* 11: profil */
+const _prof=profilePage;
+profilePage=function(){const d=document.createElement('div');d.innerHTML=_prof();d.querySelector('.screen-title')?.remove();const s=d.querySelectorAll('section');s[0]?.remove();s[1]?.remove();
+ const ai=groqApiKey?`<section class="panel ai-row"><b>AI agent faol</b><button class="btn ghost small" onclick="clearAiKey()">Uzish</button></section>`:`<section class="panel ai-row"><input id="groq-key" class="field" type="password" autocomplete="off" placeholder="API kalit"><button id="groq-save-btn" class="btn primary small" onclick="saveAiKey()">Ulash</button></section>`;
+ return ai+d.innerHTML};
+function cleanProfile(){const run=()=>document.querySelectorAll('#app > *').forEach(el=>{if(/Supabase|Hozir saqlash|sinxron/i.test(el.textContent||''))el.remove()});run();setTimeout(run,300);setTimeout(run,1200)}
+
+const _render=render;
+render=function(){_render();document.body.classList.toggle('pg-home',page==='home');
+ if(['home','tasks','translator','profile'].includes(page))document.querySelector('#app > .top')?.remove();
+ if(page==='profile')cleanProfile()};
+render();
+})();
+</script>
+</body></html>
