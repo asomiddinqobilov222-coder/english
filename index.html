@@ -689,4 +689,47 @@ render=function(){_render();document.body.classList.toggle('pg-home',page==='hom
 render();
 })();
 </script>
+<script>'use strict';
+/* 2-patch: 1-patch dan KEYIN qo‘yiladi */
+(function(){
+const css=`
+.pg-title{margin:6px 0 18px;font-size:36px;font-weight:850;letter-spacing:-1.2px}
+.task-card{min-height:96px}
+.rangebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 8px}
+.rangebar .lbl{flex:1;text-align:center;font-weight:750;font-size:13px;padding:7px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);box-shadow:inset 0 1px 0 #ffffff1c}
+.rangebar .btn{min-width:40px;padding:7px 10px}
+.hp-stats{gap:10px;margin-top:10px}
+.hp-stats b{flex:1;font-size:20px;font-weight:850;padding:10px 14px;border-radius:16px;background:var(--panel2);border:1px solid var(--line);text-align:center}
+.profcard{display:flex;align-items:center;gap:16px}
+.profcard .pic{width:68px;height:68px;border-radius:50%;object-fit:cover;border:2px solid var(--cyan);flex:none;display:grid;place-items:center;font-size:26px;font-weight:800;background:var(--panel2)}
+.profcard .nm{font-size:20px;font-weight:850;letter-spacing:-.4px;overflow-wrap:anywhere}
+.profcard .em{font-size:13px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+`;
+const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+
+/* 1: progress sana oralig‘i */
+const MONTHS=['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr'];
+function rangeLabel(){const last=new Date(),first=new Date();last.setDate(last.getDate()+chartWindowOffset);first.setDate(last.getDate()-6);const f=d=>d.getDate()+'-'+MONTHS[d.getMonth()];return f(first)+' — '+f(last)}
+updateChartWindow=function(){const w=$('.chart-wrap');if(!w)return;w.innerHTML=chart();const l=$('#chart-range-label');if(l)l.textContent=rangeLabel();bindChartGestures()};
+const _home=home;
+home=function(){return _home().replace('<h3 class="section-title">progress</h3>','<h3 class="section-title">progress</h3><div class="rangebar"><button type="button" class="btn ghost small" onclick="shiftChart(-7)" aria-label="Oldingi hafta">←</button><span class="lbl" id="chart-range-label">'+rangeLabel()+'</span><button type="button" class="btn ghost small" onclick="shiftChart(7)" aria-label="Keyingi hafta">→</button></div>')};
+
+/* 2, 3: sarlavhalar */
+const _tasks=tasksPage;
+tasksPage=function(){return '<h2 class="pg-title">Vazifalar</h2>'+_tasks()};
+const _tr=translatorPage;
+translatorPage=function(){return '<h2 class="pg-title">Tarjimon</h2>'+_tr()};
+
+/* 4: profil kartasi */
+function profCard(){
+ const u=(typeof cloud!=='undefined'&&cloud&&cloud.user)||{},m=u.user_metadata||{};
+ const name=u.name||m.full_name||m.name||'',email=u.email||'',pic=u.picture||m.avatar_url||m.picture||'';
+ const initial=(name||email||'?').trim().charAt(0).toUpperCase();
+ const img=pic?`<img class="pic" src="${esc(pic)}" alt="Profil rasmi" referrerpolicy="no-referrer">`:`<div class="pic">${esc(initial)}</div>`;
+ return `<section class="panel profcard">${img}<div style="min-width:0"><div class="nm">${esc(name||'Foydalanuvchi')}</div><div class="em">${esc(email)}</div></div></section>`}
+const _prof=profilePage;
+profilePage=function(){return profCard()+_prof()};
+
+render();
+})();</script>
 </body></html>
