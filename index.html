@@ -732,4 +732,44 @@ profilePage=function(){return profCard()+_prof()};
 
 render();
 })();</script>
+<script>'use strict';
+/* 3-patch: ustunli (bar) grafik, ekran o‘lchamiga moslashadi. 2-patch dan KEYIN qo‘yiladi */
+(function(){
+const css=`
+.hp-prog .chart-wrap{position:relative;display:block;min-height:170px}
+.hp-prog .chart-wrap svg{position:absolute;inset:0;width:100%;height:100%;max-height:none}
+.cbar{transform-box:fill-box;transform-origin:50% 100%;animation:cbar-grow .55s cubic-bezier(.2,.8,.2,1) both}
+.cslot{cursor:pointer}
+.cslot:hover .cbar{filter:brightness(1.18)}
+.cslot:focus-visible{outline:none}
+.cslot:focus-visible .ctrack{stroke:var(--yellow);stroke-width:2}
+@keyframes cbar-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.cbar{animation:none}}
+`;
+const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+
+chart=function(){
+ const wrap=document.querySelector('.chart-wrap');
+ const W=Math.max(260,wrap?.clientWidth||520),H=Math.max(150,wrap?.clientHeight||185);
+ const now=new Date(),days=[],todayKey=today();
+ for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(now.getDate()+chartWindowOffset-i);const k=dateKey(d),v=Object.values(S.progress[k]?.modes||{}).map(x=>Number(x.score)||0);days.push({k,pct:v.length?Math.round(v.reduce((a,b)=>a+b,0)/4):0,label:d.toLocaleDateString('uz-UZ',{weekday:'short'}).replace('.','')})}
+ const L=36,R=6,T=18,B=24,iw=W-L-R,ih=H-T-B,slot=iw/7,bw=Math.min(54,slot*.58),Y=p=>T+ih*(1-p/100);
+ const grid=[0,25,50,75,100].map(v=>`<g><line x1="${L}" y1="${Y(v)}" x2="${W-R}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/><text x="${L-8}" y="${Y(v)+4}" fill="currentColor" opacity=".6" font-size="11" text-anchor="end">${v}</text></g>`).join('');
+ const bars=days.map((d,i)=>{
+  const cx=L+slot*i+slot/2,x=cx-bw/2,h=ih*d.pct/100,isToday=d.k===todayKey;
+  return `<g class="cslot" tabindex="0" role="button" aria-label="${d.k}: ${d.pct}%" onclick="showProgressDay('${d.k}',${d.pct})" onkeydown="if(event.key==='Enter')showProgressDay('${d.k}',${d.pct})">
+  <rect x="${L+slot*i}" y="${T}" width="${slot}" height="${ih+B}" fill="transparent"/>
+  <rect class="ctrack" x="${x}" y="${T}" width="${bw}" height="${ih}" rx="${Math.min(10,bw/2)}" fill="currentColor" opacity=".07"/>
+  ${d.pct>0?`<rect class="cbar" x="${x}" y="${Y(d.pct)}" width="${bw}" height="${h}" rx="${Math.min(10,bw/2)}" fill="${d.pct>=70?'var(--cyan)':'var(--blue)'}"/><text x="${cx}" y="${Math.max(12,Y(d.pct)-5)}" fill="currentColor" font-size="12" font-weight="800" text-anchor="middle">${d.pct}%</text>`:''}
+  <text x="${cx}" y="${H-6}" fill="${isToday?'var(--cyan)':'currentColor'}" opacity="${isToday?1:.75}" font-size="12" font-weight="${isToday?800:500}" text-anchor="middle">${esc(d.label)}</text></g>`}).join('');
+ return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kunlik progress ustunlari">${grid}${bars}</svg>`};
+
+/* ekran o‘lchami o‘zgarganda grafikni qayta chizish */
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(page==='home'){const w=document.querySelector('.chart-wrap');if(w)w.innerHTML=chart()}},120)});
+const _render=render;
+render=function(){_render();if(page==='home'){const w=document.querySelector('.chart-wrap');if(w)w.innerHTML=chart()}};
+render();
+})();
+</script>
 </body></html>
