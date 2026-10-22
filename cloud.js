@@ -300,11 +300,9 @@ function cloudRenderAutoLoginFailed() {
 }
 
 
-window.addEventListener("load", () => {
-
-  setTimeout(cloudAutoLogin, 300);
-
-});
+// Supabase now restores the app session automatically. Do not run the legacy
+// Google Drive OAuth flow on page load; it can unexpectedly open Google UI.
+// Keep cloudAutoLogin defined only for legacy rollback/debugging, but do not call it.
 
 /* ---------------------------------------------------------
    3. Google user ma'lumotlarini olish
