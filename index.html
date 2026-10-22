@@ -181,7 +181,7 @@ body.theme-animating::after{animation:sky-sparkle .95s ease both}
 @media(prefers-reduced-motion:reduce){.celestial-transition span{animation:none!important}}
 
 </style></head><body><main id="app" class="app"></main><nav id="nav" class="bottom-nav"></nav><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="modal-root"></div>
-<script src="https://accounts.google.com/gsi/client" async defer></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="cloud.js"></script><script src="supabase-cloud.js"></script><script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="cloud.js"></script><script src="supabase-cloud.js"></script><script>
 'use strict';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
