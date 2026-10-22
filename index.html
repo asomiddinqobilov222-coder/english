@@ -180,6 +180,26 @@ body.theme-animating::after{animation:sky-sparkle .95s ease both}
 @media(max-width:520px){.celestial-transition{right:4%;top:3%;width:108px;height:108px}}
 @media(prefers-reduced-motion:reduce){.celestial-transition span{animation:none!important}}
 
+
+/* Clear press feedback, answer feedback, and subtle home-screen sparkle */
+button,.choice,.quick button,.task-card,.bottom-nav button,.theme-toggle{ -webkit-tap-highlight-color:transparent; }
+button:active,.choice:active,.quick button:active,.task-card:active,.bottom-nav button:active,.theme-toggle:active{
+  filter:brightness(1.2) saturate(1.15)!important;
+  transform:scale(.965)!important;
+  transition:transform .08s ease,filter .08s ease,background .12s ease!important;
+}
+.choice.correct{background:linear-gradient(135deg,#14513f,#1b7454)!important;border-color:#72e2ae!important;color:#eafff4!important;box-shadow:0 0 0 2px #72e2ae35,0 0 22px #42d99a38!important;animation:answer-pop .32s ease-out}
+.choice.wrong{background:linear-gradient(135deg,#542532,#792d3c)!important;border-color:#ff8793!important;color:#fff0f2!important;box-shadow:0 0 0 2px #ff879335,0 0 20px #ff647638!important;animation:answer-shake .34s ease-in-out}
+body.answer-correct #app{animation:screen-correct .42s ease-out}
+body.answer-wrong #app{animation:answer-shake .36s ease-in-out}
+@keyframes answer-pop{0%{transform:scale(.96)}65%{transform:scale(1.025)}100%{transform:scale(1)}}
+@keyframes answer-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+@keyframes screen-correct{0%{filter:brightness(1)}35%{filter:brightness(1.15) saturate(1.12)}100%{filter:brightness(1)}}
+body::after{animation:star-twinkle 4.8s ease-in-out infinite alternate}
+.celestial-transition{width:clamp(76px,12vw,118px)!important;height:clamp(76px,12vw,118px)!important;right:5%!important;top:4%!important}
+@keyframes star-twinkle{0%{opacity:.24}35%{opacity:.58}62%{opacity:.32}100%{opacity:.68}}
+@media(prefers-reduced-motion:reduce){body::after{animation:none!important}button,.choice,#app{animation:none!important;transition:none!important}}
+
 </style></head><body><main id="app" class="app"></main><nav id="nav" class="bottom-nav"></nav><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="modal-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="cloud.js"></script><script src="supabase-cloud.js"></script><script>
 'use strict';
@@ -451,8 +471,9 @@ async function aiExamples(word,translation){
 function taskView(){if(!task)return tasksPage();if(task==='flash')return flashView();if(task==='match')return matchView();if(task==='write')return writeView();return sentenceView()}
 let taskWeights={};
 function initTaskWeights(id,list){taskWeights[id]={weight:Object.fromEntries(list.map(w=>[w.id,100/list.length])),earned:{},wrong:{}}}
-function weightedWrong(id,wordId){const t=taskWeights[id];if(!t)return;t.wrong[wordId]=(t.wrong[wordId]||0)+1;t.weight[wordId]=Math.ceil(Number(t.weight[wordId]||0)/2)}
-function weightedCorrect(id,wordId){const t=taskWeights[id];if(!t||Object.prototype.hasOwnProperty.call(t.earned,wordId))return;t.earned[wordId]=Number(t.weight[wordId]||0)}
+function answerVisualFeedback(correct){const cls=correct?'answer-correct':'answer-wrong';document.body.classList.remove('answer-correct','answer-wrong');void document.body.offsetWidth;document.body.classList.add(cls);window.setTimeout(()=>document.body.classList.remove(cls),460)}
+function weightedWrong(id,wordId){answerVisualFeedback(false);const t=taskWeights[id];if(!t)return;t.wrong[wordId]=(t.wrong[wordId]||0)+1;t.weight[wordId]=Math.ceil(Number(t.weight[wordId]||0)/2)}
+function weightedCorrect(id,wordId){answerVisualFeedback(true);const t=taskWeights[id];if(!t||Object.prototype.hasOwnProperty.call(t.earned,wordId))return;t.earned[wordId]=Number(t.weight[wordId]||0)}
 function startTask(id){if(!S.words.length){go('add');toast('Avval so‘z qo‘shing.');return}const p=progressFor();let list=dueWords();if(!list.length){const savedIds=new Set(p.words||[]);list=S.words.filter(w=>savedIds.has(w.id));if(!list.length){toast('Bugun takrorlash muddati kelgan so‘z yo‘q.');return}toast('Bugungi muddatli so‘zlar tugagan. Bugungi so‘zlarni qayta mashq qilasiz.')}task=id;initTaskWeights(id,list);if(id==='flash')flash={items:[...list],all:[...list],index:0,miss:new Set(),revealed:false,correct:0};if(id==='match')match={pool:[...list],all:[...list],miss:new Set(),correct:0,round:0,selectedL:null,selectedR:null,usedL:new Set(),usedR:new Set(),pairs:[],statusL:{},statusR:{},solved:new Set()};if(id==='write')write={items:[...list],all:[...list],index:0,miss:new Set(),correct:0,feedback:''};if(id==='sentence'){sentence={items:[...list],all:[...list],index:0,miss:new Set(),correct:0,level:sentenceLevel(list[0]),feedback:''};}page='task';render();window.scrollTo({top:0,behavior:'smooth'})}
 function sentenceLevel(w){const weeks=Math.floor((Date.now()-new Date(w?.added||today()).getTime())/(7*86400000));return weeks===0?'easy':weeks===1?'normal':weeks===2?'hard':'mixed'}
 function levelFor(w){const n=Math.floor((Date.now()-new Date(w.added||today()).getTime())/(7*86400000));return n===0?'easy':n===1?'normal':n===2?'hard':['easy','normal','hard'][Math.floor(Math.random()*3)]}
