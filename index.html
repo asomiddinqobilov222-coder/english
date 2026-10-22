@@ -772,4 +772,25 @@ render=function(){_render();if(page==='home'){const w=document.querySelector('.c
 render();
 })();
 </script>
+<script>
+(function(){
+const _p=profilePage;
+window.loginNow=function(){
+  const n=['cloudLogin','supabaseLogin','cloudSignIn','signInWithGoogle'].find(x=>typeof window[x]==='function');
+  if(n)return window[n]();
+  toast('Kirish funksiyasi topilmadi');
+};
+profilePage=function(){
+  const d=document.createElement('div');
+  d.innerHTML=_p();
+  const u=(typeof cloud!=='undefined'&&cloud&&cloud.user)||null;
+  if(!u){
+    const card=d.querySelector('.profcard');
+    if(card)card.innerHTML='<div class="pic">?</div><div style="flex:1;min-width:0"><div class="nm">Foydalanuvchi</div></div><button class="btn primary small" onclick="loginNow()">Kirish</button>';
+  }
+  return d.innerHTML;
+};
+render();
+})();
+</script>
 </body></html>
