@@ -160,22 +160,49 @@ async function cloudLogout() {
   }
 }
 
+// Re-read persisted auth state when the PWA becomes visible. Some Android
+// standalone launches can deliver an early empty INITIAL_SESSION event while
+// the persisted session is still being restored.
+let sbSessionCheckInProgress = false;
+async function sbRestoreSession(source) {
+  if (sbSessionCheckInProgress) return;
+  sbSessionCheckInProgress = true;
+  try {
+    const {data, error} = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    await sbHandleSession(data.session);
+  } catch (e) {
+    console.error("Supabase session restore failed (" + source + "):", e);
+    sbLastError = e?.message || "Sessiyani tiklab bo'lmadi";
+    sbRender();
+  } finally {
+    sbSessionCheckInProgress = false;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   try {
-    // Subscribe before reading the current session so an auth event cannot be missed
-    // during startup (especially when an installed PWA is reopened).
-    const {data: authListener} = supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION" && !session) {
+        // Do not clear a valid session based only on an early empty startup event.
+        setTimeout(() => sbRestoreSession("INITIAL_SESSION"), 150);
+        return;
+      }
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         setTimeout(() => sbHandleSession(session), 0);
       }
     });
 
-    const {data, error} = await supabaseClient.auth.getSession();
-    if (error) throw error;
-    await sbHandleSession(data.session);
+    await sbRestoreSession("startup");
   } catch (e) {
     console.error("Supabase initialization failed:", e);
     sbLastError = e?.message || "Boshlashda xatolik";
     sbRender();
   }
+});
+
+// Check again whenever the installed app returns to the foreground.
+window.addEventListener("pageshow", () => sbRestoreSession("pageshow"));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") sbRestoreSession("visible");
 });
