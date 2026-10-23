@@ -2,6 +2,9 @@
    The old Google Drive implementation remains available for rollback until migration is verified. */
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
+    // Keep the same key Supabase v2 derives by default, so existing sessions remain valid.
+    storage: window.localStorage,
+    storageKey: "sb-wxrcwqlqdjljqztnpvvs-auth-token",
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
@@ -159,14 +162,17 @@ async function cloudLogout() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   try {
-    const {data, error} = await supabaseClient.auth.getSession();
-    if (error) throw error;
-    await sbHandleSession(data.session);
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+    // Subscribe before reading the current session so an auth event cannot be missed
+    // during startup (especially when an installed PWA is reopened).
+    const {data: authListener} = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         setTimeout(() => sbHandleSession(session), 0);
       }
     });
+
+    const {data, error} = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    await sbHandleSession(data.session);
   } catch (e) {
     console.error("Supabase initialization failed:", e);
     sbLastError = e?.message || "Boshlashda xatolik";
