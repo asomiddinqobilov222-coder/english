@@ -923,10 +923,10 @@ body .app .streak{
   box-shadow:0 5px 16px rgba(42,230,192,.19),inset 0 1px 1px rgba(255,255,255,.72),inset 0 -2px 3px rgba(11,130,112,.12) !important;
 }
 body .app .btn.primary{background:linear-gradient(135deg,#b0ffe9,#65f2d0 52%,#3bdabb) !important;color:#06352f !important}
-body .app .btn.ghost{background:rgba(110,241,218,.13) !important;color:var(--text) !important;border-color:rgba(151,255,240,.34) !important;box-shadow:inset 0 1px 0 rgba(255,255,255,.16) !important}
+body .app .btn.ghost{background:linear-gradient(135deg,#a5ffe8 0%,#63f3d0 48%,#39d9bb 100%) !important;color:#06352f !important;border:1px solid rgba(226,255,249,.82) !important;box-shadow:0 5px 16px rgba(42,230,192,.19),inset 0 1px 1px rgba(255,255,255,.72) !important}
 body .app .btn.danger{background:rgba(255,111,130,.13) !important;color:var(--red) !important;border:1px solid rgba(255,130,150,.35) !important}
-body .app .quick button{background:linear-gradient(145deg,rgba(112,246,220,.20),rgba(66,190,180,.10)) !important;color:var(--text) !important;border-color:rgba(151,255,240,.24) !important}
-body .app .quick button .qnum,body .app .quick button .qlabel{color:var(--text) !important}
+body .app .quick button{background:linear-gradient(135deg,#a5ffe8 0%,#63f3d0 48%,#39d9bb 100%) !important;color:#06352f !important;border-color:rgba(226,255,249,.82) !important}
+body .app .quick button .qnum,body .app .quick button .qlabel,body .app .quick button .qicon{color:#06352f !important}
 body .app .task-card,
 body .app .choice,
 body .app .board,
@@ -956,9 +956,9 @@ body .app .field,body .app input,body .app textarea,body .app select{
 body[data-theme="day"] .app .field,body[data-theme="day"] .app input,body[data-theme="day"] .app textarea,body[data-theme="day"] .app select{background:rgba(255,255,255,.32);border-color:rgba(255,255,255,.68);color:var(--text)}
 body[data-theme="day"] .app .panel{background:linear-gradient(135deg,rgba(255,255,255,.35),rgba(112,221,223,.13),rgba(255,255,255,.19)) !important;border-color:rgba(255,255,255,.62) !important;box-shadow:0 12px 30px rgba(47,108,144,.11),inset 0 1.5px 1px rgba(255,255,255,.76),inset 0 -2px 3px rgba(60,140,160,.08) !important}
 body[data-theme="day"] .app .task-card,body[data-theme="day"] .app .choice,body[data-theme="day"] .app .board,body[data-theme="day"] .app .calendar-detail,body[data-theme="day"] .app .hp-stats b,body[data-theme="day"] .app .rangebar .lbl,body[data-theme="day"] .app .list-item,body[data-theme="day"] .app .example{background:rgba(255,255,255,.25) !important;border-color:rgba(255,255,255,.58) !important}
-body .app .modal-back{background:rgba(2,14,25,.25) !important;backdrop-filter:blur(18px) saturate(125%) !important;-webkit-backdrop-filter:blur(18px) saturate(125%) !important}
-body .app .modal{background:linear-gradient(135deg,rgba(24,57,74,.80),rgba(9,25,43,.83)) !important;border:1px solid rgba(160,255,241,.30) !important;box-shadow:0 20px 65px rgba(0,10,20,.3),inset 0 1px 0 rgba(255,255,255,.18) !important;backdrop-filter:blur(24px) saturate(135%) !important;-webkit-backdrop-filter:blur(24px) saturate(135%) !important}
-body[data-theme="day"] .app .modal{background:linear-gradient(135deg,rgba(255,255,255,.83),rgba(204,244,248,.82)) !important}
+body .modal-back{background:rgba(2,14,25,.25) !important;backdrop-filter:blur(18px) saturate(125%) !important;-webkit-backdrop-filter:blur(18px) saturate(125%) !important}
+body .modal{background:linear-gradient(135deg,rgba(24,57,74,.80),rgba(9,25,43,.83)) !important;border:1px solid rgba(160,255,241,.30) !important;box-shadow:0 20px 65px rgba(0,10,20,.3),inset 0 1px 0 rgba(255,255,255,.18) !important;backdrop-filter:blur(24px) saturate(135%) !important;-webkit-backdrop-filter:blur(24px) saturate(135%) !important}
+body[data-theme="day"] .modal{background:linear-gradient(135deg,rgba(255,255,255,.83),rgba(204,244,248,.82)) !important}
 body .app .translator{gap:14px;align-items:stretch}
 body .app .translator .board{min-width:0;display:flex;flex-direction:column}
 body .app .translator-input-wrap,body .app .translator-output-wrap{position:relative;flex:1;min-height:240px}
@@ -1011,5 +1011,13 @@ body:not([data-theme="day"])::after{
 body[data-theme="day"]::after{animation:none}
 @media(max-width:520px){body .app .translator-input-wrap,body .app .translator-output-wrap,body .app #src,body .app #dst{min-height:210px}body .app .translator{gap:12px}}
 @media(prefers-reduced-motion:reduce){body:not([data-theme="day"])::after{animation:none}}
+</style>
+
+<style>
+/* Keep the bottom navigation in the same translucent glass language */
+.bottom-nav{background:rgba(10,29,43,.48) !important;border-color:rgba(151,255,240,.24) !important;box-shadow:0 15px 45px rgba(0,10,20,.25),inset 0 1px 0 rgba(255,255,255,.10) !important;backdrop-filter:blur(24px) saturate(135%) !important;-webkit-backdrop-filter:blur(24px) saturate(135%) !important}
+.bottom-nav button{background:transparent !important;color:var(--muted) !important;box-shadow:none !important;border:0 !important}
+.bottom-nav button.active{background:linear-gradient(135deg,#a5ffe8,#63f3d0 55%,#39d9bb) !important;color:#06352f !important}
+body[data-theme="day"] .bottom-nav{background:rgba(255,255,255,.42) !important;border-color:rgba(255,255,255,.72) !important}
 </style>
 </body></html>
