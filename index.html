@@ -207,23 +207,8 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const defaults=()=>({words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:'en-US'},history:{}});
-function loadLocalState(){
-  try {
-    const key = typeof cloudDataStorageKey === 'function' ? cloudDataStorageKey() : 'eng-data:local';
-    let raw = localStorage.getItem(key);
-    if (!raw && !cloud?.user) raw = localStorage.getItem('eng');
-    const data = JSON.parse(raw || 'null');
-    if (!data || typeof data !== 'object' || Array.isArray(data)) return defaults();
-    return {...defaults(), ...data,
-      words: Array.isArray(data.words) ? data.words : [],
-      progress: data.progress && typeof data.progress === 'object' ? data.progress : {},
-      cache: data.cache && typeof data.cache === 'object' ? data.cache : {s:{},t:{}},
-      set: {...defaults().set, ...(data.set || {})},
-      history: data.history && typeof data.history === 'object' ? data.history : {}
-    };
-  } catch (error) { console.warn('Local backup could not be loaded:', error); return defaults(); }
-}
-let S=loadLocalState();
+// Lug‘at va progress faqat autentifikatsiyalangan Supabase akkauntidan yuklanadi.
+let S=defaults();
 let groqApiKey='';
 let aiProvider='';
 let aiModel='';
@@ -249,7 +234,6 @@ function persistAiKey(key,provider,model){
 }
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),lastReviewedOn:String(w.lastReviewedOn||w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
-saveLocal();
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
 const MODES=[{id:'flash',icon:'🪄',title:'Flashcard',desc:'So‘zni eslab qolish'},{id:'match',icon:'🧩',title:'Moslashtirish',desc:'So‘z va tarjimani topish'},{id:'write',icon:'⌨️',title:'Yozish',desc:'Inglizchasini yozish'},{id:'sentence',icon:'✍️',title:'Gap tuzish',desc:'Gapni tarjima qilib yozish'}];
 let page='home',task=null,modalResolve=null,flash=null,match=null,write=null,sentence=null,translator={sl:'en',tl:'uz',result:'',examples:[]},matchState=null;
@@ -260,15 +244,8 @@ function dayDate(key){const [y,m,d]=String(key||today()).split('-').map(Number);
 function due(w){if(w.reviewedOn===today())return false;const done=Array.isArray(w.done)?w.done:[];const next=REVIEW_INTERVALS.find(n=>!done.includes(n));if(next===undefined)return false;const base=next===0?(w.added||today()):(w.lastReviewedOn||w.reviewedOn||w.added||today());const dueDate=dayDate(base);dueDate.setDate(dueDate.getDate()+next);return dueDate<=dayDate(today())}
 function dueWords(){return S.words.filter(due)}
 function markReviewed(words,missed=new Set()){const todayKey=today();const missedIds=missed instanceof Set?missed:new Set(missed||[]);for(const w of words||[]){if(!w||missedIds.has(w.id)||w.reviewedOn===todayKey)continue;const done=Array.isArray(w.done)?w.done:(w.done=[]);const next=REVIEW_INTERVALS.find(n=>!done.includes(n));if(next===undefined)continue;if(!due(w))continue;done.push(next);w.reviewedOn=todayKey;w.lastReviewedOn=todayKey}}
-function saveLocal(){
-  try {
-    const key = typeof cloudDataStorageKey === 'function' ? cloudDataStorageKey() : 'eng-data:local';
-    localStorage.setItem(key, JSON.stringify(S));
-  } catch (error) {
-    console.warn('Local backup could not be saved:', error);
-    toast('Qurilmadagi zaxira saqlanmadi. Xotira joyini tekshiring.');
-  }
-}
+// Ataylab localStorage’ga lug‘at/progress yozilmaydi: yagona manba Supabase.
+function saveLocal(){}
 function save(){saveLocal();if(typeof cloudSaveDebounced==='function')cloudSaveDebounced()}
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2400)}
 function sound(ok=true){if(!S.set.sound)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=ok?740:230;g.gain.setValueAtTime(.0001,c.currentTime);g.gain.exponentialRampToValueAtTime(.055,c.currentTime+.015);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.12);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.13);o.onended=()=>c.close()}catch{}}
@@ -314,7 +291,7 @@ async function addTranslatorWord(){
  const exact=S.words.find(w=>w.word.toLowerCase()===word.toLowerCase());
  if(exact)return toast('“'+exact.word+'” — bu so‘z lug‘atga allaqachon qo‘shilgan.');
  const w={id:uid(),word,translation,added:today(),done:[],examples:{easy:null,normal:null,hard:null}};
- S.words.push(w);const p=progressFor();if(!p.words.includes(w.id))p.words.push(w.id);save();toast('So‘z lug‘atga qo‘shildi.');render()
+ S.words.push(w);const p=progressFor();if(!p.words.includes(w.id))p.words.push(w.id);save();render()
 }
 let liveSpellRequestId=0;
 function scheduleLiveSpellcheck(){
@@ -593,7 +570,7 @@ function openCalendar(){
  modal('Mashqlar kalendari','<div class="calendar-month-content">'+calendarBodyHTML()+'</div>');
  const el=$('#modal-root .modal');if(el&&!el.dataset.swipeBound){el.dataset.swipeBound='1';let x=0,y=0,t=0;const down=(px,py)=>{x=px;y=py;t=Date.now()};const up=(px,py)=>{const dx=px-x,dy=py-y,elapsed=Date.now()-t;if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)*1.25){const distance=Math.abs(dx),speed=distance/Math.max(1,elapsed),steps=Math.min(3,Math.max(1,Math.round(distance/95)+Math.min(2,Math.floor(speed*5))));changeCalendarMonth((dx<0?1:-1)*steps)}};el.addEventListener('touchstart',e=>{const q=e.changedTouches[0];down(q.clientX,q.clientY)},{passive:true});el.addEventListener('touchend',e=>{const q=e.changedTouches[0];up(q.clientX,q.clientY)},{passive:true});el.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')down(e.clientX,e.clientY)},{passive:true});el.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')up(e.clientX,e.clientY)},{passive:true})}
 }
-async function confirmLogout(){const ok=await modal('Google profilidan chiqilsinmi?','<p class="subhead">Chiqishdan oldin saqlash tugaydi. Lug‘at Google Drive va shu hisobga bog‘langan zaxirada saqlanadi.</p>',[{text:'Bekor qilish',value:false},{text:'Ha, chiqish',value:true,primary:true}]);if(ok&&typeof cloudLogout==='function'){await cloudLogout();toast('Google profili uzildi.');render()}}
+async function confirmLogout(){const ok=await modal('Profildan chiqilsinmi?','<p class="subhead">Ma’lumotlaringiz Supabase hisobingizda saqlanadi.</p>',[{text:'Bekor qilish',value:false},{text:'Ha, chiqish',value:true,primary:true}]);if(ok&&typeof cloudLogout==='function'){await cloudLogout();toast('Google profili uzildi.');render()}}
 function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`english-soz-${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast('Zaxira fayli tayyor.')}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.words))throw Error('format');const ok=await modal('Ma’lumotni tiklash','<p class="subhead">Joriy lug‘at o‘rniga zaxiradagi ma’lumotlar yuklanadi. Avval eksport qilib qo‘yish tavsiya etiladi.</p>',[{text:'Bekor qilish',value:false},{text:'Tiklash',value:true,primary:true}]);if(!ok)return;S={...defaults(),...data,set:{...defaults().set,...data.set}};S.words=S.words.map(w=>({...w,id:String(w.id||uid()),done:Array.isArray(w.done)?w.done:[],examples:normalizeExamples(w.examples,w.example)}));save();render();toast('Ma’lumot tiklandi.')}catch{toast('JSON faylni o‘qib bo‘lmadi.')}}
 async function aiRegenerate(id){const w=S.words.find(x=>x.id===id);if(!w)return;toast('AI misollar tayyorlanmoqda…');try{w.examples={...w.examples,...await aiExamples(w.word,w.translation)};save();render();toast('Misollar yangilandi.')}catch(e){console.warn(e);toast('Groq API kalitini tekshiring yoki qayta kiriting.')}}
