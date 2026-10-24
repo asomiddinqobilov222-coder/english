@@ -770,4 +770,14 @@ profilePage=function(){
 render();
 })();
 </script>
+
+<style>
+/* Engliwords home vertical scrolling fix */
+html:has(body.pg-home){min-height:100%;overflow-y:auto}
+body.pg-home{height:auto;min-height:100vh;min-height:100dvh;overflow-x:hidden;overflow-y:auto}
+body.pg-home .app{height:auto;min-height:100vh;min-height:100dvh;display:block;overflow:visible;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+body.pg-home .app .hp-prog{height:auto;min-height:260px;flex:none}
+body.pg-home .app .hp-prog .chart-wrap{height:190px;min-height:190px;flex:none}
+</style>
+
 </body></html>
