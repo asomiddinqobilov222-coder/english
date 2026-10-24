@@ -53,28 +53,29 @@ async function sbLoadOrMigrate(user) {
   if (error) throw error;
   if (row) {
     S = sbNormalizeState(row.data);
-    if (typeof saveLocal === "function") saveLocal();
+    
     if (typeof render === "function") render();
     return;
   }
-  // First login only: preserve and migrate the current local state instead of overwriting it with an empty object.
-  const initial = sbNormalizeState(S);
+  // A new Supabase user must never inherit another profile’s browser state.
+  const initial = sbNormalizeState(defaults());
   const {error: insertError} = await supabaseClient.from("user_data").insert({user_id:user.id,data:initial,updated_at:new Date().toISOString()});
   if (insertError) throw insertError;
   S = initial;
-  if (typeof saveLocal === "function") saveLocal();
 }
 
 async function sbHandleSession(session) {
   const user = session && session.user;
   if (!user) {
     sbUserId = null;
+    S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
     window.__sbProfile = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; cloud.token = null; }
     sbRender();
     return;
   }
-  if (sbHandlingUser === user.id) return;
+  if (sbHandlingUser === user.id && sbUserId === user.id) return;
+  if (sbUserId !== user.id) S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
   sbHandlingUser = user.id;
   sbBusy = true;
   sbLastError = "";
@@ -88,7 +89,7 @@ async function sbHandleSession(session) {
   } catch (e) {
     console.error("Supabase load failed:", e);
     sbLastError = e?.message || "Ma'lumotlarni yuklab bo'lmadi";
-    if (typeof toast === "function") toast("Supabase bilan ulanish xatosi. Ma'lumotlar qurilmada saqlanib qoladi.");
+
   } finally {
     sbBusy = false;
     sbHandlingUser = null;
@@ -124,13 +125,12 @@ async function cloudUpload() {
       updated_at: new Date().toISOString()
     }, {onConflict:"user_id"});
     if (error) throw error;
-    if (typeof saveLocal === "function") saveLocal();
     sbLastError = "";
-    if (typeof toast === "function") toast("Ma'lumotlar Supabase'ga saqlandi.");
+
   } catch (e) {
     console.error("Supabase save failed:", e);
     sbLastError = e?.message || "Saqlash amalga oshmadi";
-    if (typeof toast === "function") toast("Bulutga saqlash amalga oshmadi. Qurilmadagi nusxa saqlanadi.");
+
   } finally {
     sbBusy = false;
     sbRender();
@@ -144,14 +144,15 @@ function cloudSaveDebounced() {
 }
 
 async function cloudLogout() {
-  if (!confirm("Supabase akkauntidan chiqilsinmi? Qurilmadagi mahalliy zaxira saqlanib qoladi.")) return;
+  if (!confirm("Profildan chiqilsinmi?")) return;
   try {
     const {error} = await supabaseClient.auth.signOut();
     if (error) throw error;
     sbUserId = null;
+    S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
     sbLastError = "";
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; cloud.token = null; }
-    if (typeof toast === "function") toast("Akkauntdan chiqildi. Qurilmadagi zaxira saqlanib qoldi.");
+
     if (typeof render === "function") render();
     sbRender();
   } catch (e) {
@@ -159,6 +160,13 @@ async function cloudLogout() {
     alert("Chiqishda xatolik: " + (e?.message || "Noma'lum xato"));
   }
 }
+
+// Remove legacy local copies of vocabulary/progress so they cannot leak across profiles.
+try {
+  for (const key of Object.keys(localStorage)) {
+    if (key === "eng" || key.startsWith("eng-data:")) localStorage.removeItem(key);
+  }
+} catch (e) { console.warn("Legacy local data cleanup failed:", e); }
 
 // Re-read persisted auth state when the PWA becomes visible. Some Android
 // standalone launches can deliver an early empty INITIAL_SESSION event while
