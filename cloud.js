@@ -523,7 +523,7 @@ async function cloudLogout() {
     if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
     cloud.saveTimer = null;
     if (cloud.lastError) {
-      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      console.warn("Legacy Drive sync failed during logout.");
       break;
     }
     if (!scheduled && !cloud.pendingSave) break;
@@ -531,12 +531,12 @@ async function cloudLogout() {
     await cloudUpload();
     attempts++;
     if (cloud.lastError) {
-      alert("Google Drive'ga oxirgi o'zgarishlarni saqlashda xatolik yuz berdi. Qurilmadagi zaxira saqlanib qoldi.");
+      console.warn("Legacy Drive sync failed during logout.");
       break;
     }
   }
 
-  try { saveLocal(); } catch {}
+  // App data is stored in Supabase only; do not create a local copy on logout.
   if (cloud.saveTimer) clearTimeout(cloud.saveTimer);
   cloud.saveTimer = null;
   if (cloud.token && typeof google !== "undefined" && google.accounts?.oauth2?.revoke) {
