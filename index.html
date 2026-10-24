@@ -787,4 +787,32 @@ body.pg-home .app>.panel{margin-bottom:12px !important}
 body.pg-home .app>.panel:last-of-type{margin-bottom:12px !important}
 </style>
 
+
+<style>
+/* Temporary glassmorphism preview — home screen only */
+body.pg-home .app .panel{
+  background:linear-gradient(135deg,rgba(85,230,208,.14),rgba(135,240,212,.07) 55%,rgba(108,140,255,.08)) !important;
+  border:1px solid rgba(135,240,212,.34) !important;
+  box-shadow:0 12px 34px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.10) !important;
+  -webkit-backdrop-filter:blur(18px) saturate(135%);
+  backdrop-filter:blur(18px) saturate(135%);
+}
+body.pg-home .app .btn,
+body.pg-home .app .quick button,
+body.pg-home .app .plus,
+body.pg-home .app button.primary{
+  background:linear-gradient(120deg,var(--cyan),#87f0d4) !important;
+  border-color:transparent !important;
+  color:#07171a !important;
+  box-shadow:0 5px 16px rgba(85,230,208,.18);
+}
+body.pg-home .app .quick button .qlabel,
+body.pg-home .app .quick button .qnum,
+body.pg-home .app .quick button .qicon{color:#07171a !important}
+body.pg-home .app .quick button{border-radius:16px}
+body.pg-home .app .btn:hover,
+body.pg-home .app .quick button:hover,
+body.pg-home .app .plus:hover{filter:brightness(1.06);transform:translateY(-1px)}
+</style>
+
 </body></html>
