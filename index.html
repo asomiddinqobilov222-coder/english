@@ -1065,7 +1065,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     micLastActivity=Date.now();
     recognition=new SpeechRecognition();
     recognition.lang=translator.sl==='en'?(S.set.accent||'en-US'):'uz-UZ';
-    recognition.interimResults=true;
+    recognition.interimResults=false;
     recognition.continuous=true;
     recognition.onstart=()=>{setMicState(true);scheduleMicSilenceStop()};
     recognition.onresult=e=>{
