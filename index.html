@@ -1036,6 +1036,20 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
 /* Translator voice input and reliable language-specific speech output. */
 (function(){
   let recognition = null;
+  let micSilenceTimer = null;
+  let micManualStop = false;
+  let micLastActivity = 0;
+  function scheduleMicSilenceStop(){
+    clearTimeout(micSilenceTimer);
+    micSilenceTimer=setTimeout(()=>{
+      if(!recognition)return;
+      micManualStop=true;
+      const active=recognition;
+      recognition=null;
+      setMicState(false);
+      try{active.stop()}catch{}
+    },5000);
+  }
   function setMicState(listening){
     const b=document.getElementById('mic-src');
     if(!b)return;
@@ -1046,13 +1060,17 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   function startMic(){
     const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SpeechRecognition){toast('Bu brauzer ovoz orqali matn kiritishni qo‘llamaydi. Chrome brauzerida sinab ko‘ring.');return}
-    if(recognition){try{recognition.stop()}catch{} recognition=null;setMicState(false);return}
+    if(recognition){micManualStop=true;clearTimeout(micSilenceTimer);const active=recognition;recognition=null;try{active.stop()}catch{}setMicState(false);return}
+    micManualStop=false;
+    micLastActivity=Date.now();
     recognition=new SpeechRecognition();
     recognition.lang=translator.sl==='en'?(S.set.accent||'en-US'):'uz-UZ';
-    recognition.interimResults=false;
-    recognition.continuous=false;
-    recognition.onstart=()=>setMicState(true);
+    recognition.interimResults=true;
+    recognition.continuous=true;
+    recognition.onstart=()=>{setMicState(true);scheduleMicSilenceStop()};
     recognition.onresult=e=>{
+      micLastActivity=Date.now();
+      scheduleMicSilenceStop();
       const text=Array.from(e.results||[]).map(x=>x[0]?.transcript||'').join(' ').trim();
       if(!text)return;
       const src=document.getElementById('src');
@@ -1066,9 +1084,14 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
         'audio-capture':'Mikrofon topilmadi yoki boshqa dastur foydalanmoqda.',
         'network':'Ovozni aniqlash xizmati uchun internet aloqasini tekshiring.'
       };
-      if(e.error!=='aborted')toast(messages[e.error]||'Ovozni aniqlashda xatolik yuz berdi.');
+      if(e.error!=='aborted'&&!(e.error==='no-speech'&&Date.now()-micLastActivity<5000))toast(messages[e.error]||'Ovozni aniqlashda xatolik yuz berdi.');
     };
-    recognition.onend=()=>{recognition=null;setMicState(false)};
+    recognition.onend=()=>{
+      if(micManualStop||!recognition){clearTimeout(micSilenceTimer);recognition=null;setMicState(false);return}
+      if(Date.now()-micLastActivity>=5000){clearTimeout(micSilenceTimer);recognition=null;setMicState(false);return}
+      const active=recognition;
+      setTimeout(()=>{if(recognition===active&&!micManualStop){try{active.start()}catch{}}},120);
+    };
     try{recognition.start()}catch(e){recognition=null;setMicState(false);toast('Mikrofonni ishga tushirib bo‘lmadi. Qayta urinib ko‘ring.')}
   }
   document.addEventListener('click',e=>{
