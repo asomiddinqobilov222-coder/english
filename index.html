@@ -1209,12 +1209,24 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     return html+resultsCard();
   };
   let emptyCelebrationActive=false;
+  function emptyTaskCelebration(){
+    const bursts=[{x:12,y:22},{x:50,y:17},{x:87,y:24},{x:25,y:66},{x:73,y:69},{x:50,y:47}];
+    let particles='';
+    bursts.forEach((b,bi)=>{for(let i=0;i<38;i++){
+      const angle=(i*360/38)+(bi%2?4:0),rad=angle*Math.PI/180;
+      const distance=100+(i%7)*22;
+      const dx=Math.round(Math.cos(rad)*distance),dy=Math.round(Math.sin(rad)*distance);
+      const delay=(1.35+bi*.12+(i%6)*.035).toFixed(2);
+      particles+='<i style="--x:'+b.x+'%;--y:'+b.y+'%;--dx:'+dx+'px;--dy:'+dy+'px;--angle:'+(i*47%360)+'deg;--delay:'+delay+'s;--hue:'+((i*29+bi*71)%360)+'"></i>';
+    }});
+    const flashes=bursts.map((b,i)=>'<span class="tasks-firework-flash" style="--x:'+b.x+'%;--y:'+b.y+'%;--delay:'+(1.34+i*.12)+'s"></span>').join('');
+    return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Qoyil!!! vazifalar qolmadi.</div></div><div class="tasks-fullscreen-fireworks" aria-hidden="true">'+flashes+particles+'</div></div>';
+  }
   tasksPage=function(){
     const cards=groupCards();
     if(cards.includes('group-task-card')){emptyCelebrationActive=false;return '<div class="panel task-screen">'+cards+'</div>'}
-    if(emptyCelebrationActive)return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Qoyil!!! vazifalar qolmadi.</div><div class="tasks-fireworks" aria-hidden="true">'+Array.from({length:28},(_,i)=>'<i style="--i:'+i+';--angle:'+(i*360/28)+'deg;--delay:'+(1.35+(i%5)*.055)+'s;--distance:'+(72+(i%4)*19)+'px"></i>').join('')+'</div></div></div>';
-    emptyCelebrationActive=true;
-    return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Qoyil!!! vazifalar qolmadi.</div><div class="tasks-fireworks" aria-hidden="true">'+Array.from({length:28},(_,i)=>'<i style="--i:'+i+';--angle:'+(i*360/28)+'deg;--delay:'+(1.35+(i%5)*.055)+'s;--distance:'+(72+(i%4)*19)+'px"></i>').join('')+'</div></div></div>'
+    if(!emptyCelebrationActive)emptyCelebrationActive=true;
+    return emptyTaskCelebration();
   };
   function resultRow(w){
     const status=wordStatus(w),avg=wordAverage(w);
@@ -1329,14 +1341,16 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
 
 
 <style id="engliwords-empty-task-celebration">
-.tasks-empty-screen{min-height:68vh;display:grid;place-items:center;position:relative;overflow:hidden;padding:24px 12px}
-.tasks-empty-celebration{position:relative;display:grid;place-items:center;width:100%;min-height:180px}
+.tasks-empty-screen{min-height:68vh;display:grid;place-items:center;position:relative;overflow:visible;padding:24px 12px}
+.tasks-empty-celebration{position:relative;z-index:2;display:grid;place-items:center;width:100%;min-height:180px}
 .tasks-empty-message{position:relative;z-index:2;text-align:center;color:#39df8b;font-size:clamp(25px,5.6vw,40px);line-height:1.25;font-weight:900;letter-spacing:-.6px;text-shadow:0 0 18px #39df8b35;animation:tasks-ball-drop 1.25s cubic-bezier(.22,.75,.3,1) both}
-.tasks-fireworks{position:absolute;z-index:1;left:50%;top:50%;width:1px;height:1px;pointer-events:none}
-.tasks-fireworks i{position:absolute;left:0;top:0;width:7px;height:11px;border-radius:2px;background:hsl(calc(var(--i)*29deg),90%,62%);opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.25);animation:tasks-firework 1.15s ease-out var(--delay) both}
-.tasks-fireworks i:nth-child(3n){width:5px;height:5px;border-radius:50%}
+.tasks-fullscreen-fireworks{position:fixed;inset:0;z-index:10000;overflow:hidden;pointer-events:none}
+.tasks-fullscreen-fireworks i{position:absolute;left:var(--x);top:var(--y);width:7px;height:13px;border-radius:2px;background:hsl(var(--hue),100%,62%);box-shadow:0 0 8px hsl(var(--hue),100%,65%);opacity:0;transform:translate(0,0) rotate(0) scale(.2);animation:tasks-fullscreen-burst 1.8s cubic-bezier(.12,.55,.28,1) var(--delay) both}
+.tasks-fullscreen-fireworks i:nth-of-type(3n){width:5px;height:5px;border-radius:50%}
+.tasks-firework-flash{position:absolute;left:var(--x);top:var(--y);width:10px;height:10px;border:2px solid #fff7b0;border-radius:50%;opacity:0;box-shadow:0 0 18px 7px #fff5a0;transform:translate(-50%,-50%) scale(.1);animation:tasks-flash-pop .72s ease-out var(--delay) both}
 @keyframes tasks-ball-drop{0%{opacity:0;transform:translateY(-48vh) scale(.8)}42%{opacity:1;transform:translateY(0) scale(1.04,.88)}52%{transform:translateY(-27px) scale(.96,1.05)}64%{transform:translateY(0) scale(1.02,.96)}74%{transform:translateY(-11px) scale(.99,1.02)}84%{transform:translateY(0) scale(1.01,.99)}92%{transform:translateY(-4px) scale(1,1)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes tasks-firework{0%{opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.2)}12%{opacity:1}78%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateY(calc(var(--distance)*-1)) scale(1) rotate(160deg)}}
-@media(prefers-reduced-motion:reduce){.tasks-empty-message,.tasks-fireworks i{animation:none!important;opacity:1}.tasks-fireworks i{display:none}}
+@keyframes tasks-fullscreen-burst{0%{opacity:0;transform:translate(0,0) rotate(0) scale(.2)}8%{opacity:1}58%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(540deg) scale(1.05)}}
+@keyframes tasks-flash-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.1)}18%{opacity:.95}100%{opacity:0;transform:translate(-50%,-50%) scale(15)}}
+@media(prefers-reduced-motion:reduce){.tasks-empty-message,.tasks-fullscreen-fireworks *{animation:none!important;opacity:1}.tasks-fullscreen-fireworks{display:none}}
 </style>
 </body></html>
