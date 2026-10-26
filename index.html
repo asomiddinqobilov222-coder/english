@@ -1208,7 +1208,14 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     if(start>=0){const end=html.indexOf('</section>',start);if(end>=0)html=html.slice(0,start)+'<section class="panel">'+groupCards()+'</section>'+html.slice(end+10)}
     return html+resultsCard();
   };
-  tasksPage=function(){const cards=groupCards();return '<div class="panel task-screen">'+(cards.includes('group-task-card')?cards:'<div class="tasks-empty">Qoyil!!! vazifalar qolmadi.</div>')+'</div>'};
+  let emptyCelebrationActive=false;
+  tasksPage=function(){
+    const cards=groupCards();
+    if(cards.includes('group-task-card')){emptyCelebrationActive=false;return '<div class="panel task-screen">'+cards+'</div>'}
+    if(emptyCelebrationActive)return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Qoyil!!! vazifalar qolmadi.</div><div class="tasks-fireworks" aria-hidden="true">'+Array.from({length:28},(_,i)=>'<i style="--i:'+i+';--angle:'+(i*360/28)+'deg;--delay:'+(1.35+(i%5)*.055)+'s;--distance:'+(72+(i%4)*19)+'px"></i>').join('')+'</div></div></div>';
+    emptyCelebrationActive=true;
+    return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Qoyil!!! vazifalar qolmadi.</div><div class="tasks-fireworks" aria-hidden="true">'+Array.from({length:28},(_,i)=>'<i style="--i:'+i+';--angle:'+(i*360/28)+'deg;--delay:'+(1.35+(i%5)*.055)+'s;--distance:'+(72+(i%4)*19)+'px"></i>').join('')+'</div></div></div>'
+  };
   function resultRow(w){
     const status=wordStatus(w),avg=wordAverage(w);
     return '<button type="button" class="result-word status-'+status+'" data-word-id="'+esc(String(w.id))+'" onclick="showWordResult(this.dataset.wordId)" aria-label="'+esc(w.word)+' natijalarini ko‘rish"><span class="result-word-main"><span class="result-word-name">'+esc(w.word)+'</span><span class="result-word-translation">'+esc(w.translation||'Tarjima mavjud emas')+'</span></span><span class="result-word-average">'+(avg===null?'—':avg+'%')+'</span></button>';
@@ -1320,4 +1327,16 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
 })();
 </script>
 
+
+<style id="engliwords-empty-task-celebration">
+.tasks-empty-screen{min-height:68vh;display:grid;place-items:center;position:relative;overflow:hidden;padding:24px 12px}
+.tasks-empty-celebration{position:relative;display:grid;place-items:center;width:100%;min-height:180px}
+.tasks-empty-message{position:relative;z-index:2;text-align:center;color:#39df8b;font-size:clamp(25px,5.6vw,40px);line-height:1.25;font-weight:900;letter-spacing:-.6px;text-shadow:0 0 18px #39df8b35;animation:tasks-ball-drop 1.25s cubic-bezier(.22,.75,.3,1) both}
+.tasks-fireworks{position:absolute;z-index:1;left:50%;top:50%;width:1px;height:1px;pointer-events:none}
+.tasks-fireworks i{position:absolute;left:0;top:0;width:7px;height:11px;border-radius:2px;background:hsl(calc(var(--i)*29deg),90%,62%);opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.25);animation:tasks-firework 1.15s ease-out var(--delay) both}
+.tasks-fireworks i:nth-child(3n){width:5px;height:5px;border-radius:50%}
+@keyframes tasks-ball-drop{0%{opacity:0;transform:translateY(-48vh) scale(.8)}42%{opacity:1;transform:translateY(0) scale(1.04,.88)}52%{transform:translateY(-27px) scale(.96,1.05)}64%{transform:translateY(0) scale(1.02,.96)}74%{transform:translateY(-11px) scale(.99,1.02)}84%{transform:translateY(0) scale(1.01,.99)}92%{transform:translateY(-4px) scale(1,1)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tasks-firework{0%{opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.2)}12%{opacity:1}78%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateY(calc(var(--distance)*-1)) scale(1) rotate(160deg)}}
+@media(prefers-reduced-motion:reduce){.tasks-empty-message,.tasks-fireworks i{animation:none!important;opacity:1}.tasks-fireworks i{display:none}}
+</style>
 </body></html>
