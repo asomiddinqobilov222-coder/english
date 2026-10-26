@@ -374,8 +374,9 @@ async function saveAiKey(){
   if(provider)model=await testAiProvider(key,provider);
   else{try{provider='xai';model=await testAiProvider(key,provider)}catch(first){provider='groq';try{model=await testAiProvider(key,provider)}catch(second){throw new Error('Kalit Grok (xAI) yoki Groq API kaliti sifatida tekshirilmadi. '+(second.message||first.message))}}}
   persistAiKey(key,provider,model);
-  // /models muvaffaqiyati yetarli emas: haqiqiy chat so‘rovini ham sinab ko‘ramiz.
-  await aiExamples('curious','qiziquvchan');
+  // Kalitni tekshirishda qimmat 3 ta misol yaratmaymiz; qisqa chat ping yetarli.
+  const ping=await aiFetch(aiBase(provider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'Reply OK only.'}],max_completion_tokens:16,...(/^qwen\/qwen3\./i.test(model)?{reasoning_effort:'none'}:{})})},15000);
+  if(!String(ping?.choices?.[0]?.message?.content||'').trim())throw new Error('AI modeli javob qaytarmadi.');
   toast('✓ '+(provider==='xai'?'Grok (xAI)':'Groq')+' gap tuzish sinovidan o‘tdi. Model: '+model);render();
  }catch(e){aiLastError=e?.message||'Noma’lum xato';console.warn('AI key validation failed:',aiLastError);try{localStorage.removeItem(aiStorageKey())}catch{}groqApiKey='';aiProvider='';aiModel='';toast('AI gap tuzish sinovidan o‘tmadi: '+aiLastError.slice(0,150));if(btn){btn.disabled=false;btn.textContent='Ulash va tekshirish'}const err=$('#ai-key-error');if(err)err.textContent='Sinov muvaffaqiyatsiz: '+aiLastError}
 }
@@ -400,7 +401,7 @@ async function aiExamples(word,translation){
  const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b'),messages:[
   {role:'system',content:'You are a precise English teacher for Uzbek-speaking learners. Create short, grammatically correct example sentences and accurate natural Uzbek translations. Output valid JSON only. Translate each complete sentence, not just the vocabulary word.'},
   {role:'user',content:prompt}
- ],temperature:0.7,reasoning_effort:'none',max_completion_tokens:1400,response_format:{type:'json_object'}};
+ ],temperature:0.5,reasoning_effort:'none',max_completion_tokens:700,response_format:{type:'json_object'}};
  const opts={method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey}};
  async function requestWithFormatFallback(model){
   const body={...payload,model};
