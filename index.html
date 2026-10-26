@@ -1114,4 +1114,151 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
 })();
 </script>
 
+
+<style id="engliwords-learning-results-style">
+.results-legend{display:flex;flex-wrap:wrap;gap:9px 14px;margin:12px 0 16px}.results-legend span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}.status-new{--status:#f3b64d}.status-learning{--status:#6d9cff}.status-ready{--status:#45d6a0}.result-search{width:100%;min-height:45px;padding:11px 14px;border-radius:13px;border:1px solid var(--line);background:var(--panel);color:var(--text);margin:8px 0 12px}.result-group-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 0 8px}.result-word{position:relative;border:1px solid color-mix(in srgb,var(--status) 60%,transparent);border-left:4px solid var(--status);border-radius:13px;padding:12px 14px;margin:8px 0;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}.result-word-main{min-width:0}.result-word-name{font-weight:800;overflow-wrap:anywhere}.result-word-translation{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}.result-word-average{font-size:18px;font-weight:800;white-space:nowrap;color:var(--status)}.result-details{display:none;position:absolute;z-index:8;left:8px;right:8px;top:calc(100% - 2px);padding:12px;background:var(--panel2);border:1px solid var(--status);border-radius:12px;box-shadow:var(--shadow);font-size:12px}.result-word:hover .result-details,.result-word:focus-within .result-details,.result-word.open .result-details{display:block}.result-detail-row{display:flex;justify-content:space-between;gap:12px;padding:4px 0}.result-detail-row b{white-space:nowrap}.group-task-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.group-task-card{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:14px;text-align:left;min-width:0;transition:transform .18s,border-color .18s}.group-task-card:hover{transform:translateY(-2px);border-color:var(--cyan)}.group-task-card b{display:block;font-size:14px}.group-task-card small{display:block;margin-top:5px}.group-task-count{display:inline-flex;margin-top:11px;padding:4px 8px;border-radius:999px;background:#ffffff0c;font-size:11px}.task-transition{position:fixed;z-index:9999;inset:0;display:grid;place-items:center;background:#050914d9;backdrop-filter:blur(8px);pointer-events:none;animation:task-title-in .22s ease-out}.task-transition strong{font-size:clamp(28px,7vw,52px);letter-spacing:-1px;text-align:center;padding:24px;color:#fff;text-shadow:0 6px 32px #0008}.task-transition small{display:block;text-align:center;font-size:13px;margin-top:8px;color:#c9d8f2;font-weight:600;letter-spacing:1px}@keyframes task-title-in{from{opacity:0}to{opacity:1}}@media(max-width:650px){.group-task-list{grid-template-columns:1fr}.result-word{padding:11px}.result-word-average{font-size:16px}}
+</style>
+<script id="engliwords-learning-results-patch">
+(function(){
+  const exerciseTypes=[
+    {id:'flash',label:'Flashcard'},
+    {id:'match',label:'Moslashtirish'},
+    {id:'write',label:'Inglizchada yozish'},
+    {id:'sentence',label:'Gaplarni tarjima qilish'},
+    {id:'conversation',label:'Real suhbatlar'}
+  ];
+  const statusText={new:'Yangi so‘z',learning:'O‘rganilmoqda',ready:'Erkin ishlatiladi'};
+  let activeGroup=null,activeTaskWords=null,taskFlowIndex=0,taskTransitionLabel='',resultFilter='';
+  const originalHome=home,originalTasksPage=tasksPage,originalRender=render,originalStartTask=startTask,originalFinishTask=finishTask,originalTaskView=taskView;
+  function learningData(w){
+    if(!w.learning||typeof w.learning!=='object')w.learning={status:'new',scores:{}};
+    if(!w.learning.scores||typeof w.learning.scores!=='object')w.learning.scores={};
+    return w.learning;
+  }
+  function scoreFor(w,id){
+    const d=learningData(w).scores[id];
+    return d&&Number.isFinite(Number(d.average))?Math.max(0,Math.min(100,Number(d.average))):null;
+  }
+  function wordAverage(w){
+    const values=exerciseTypes.map(t=>scoreFor(w,t.id)).filter(v=>v!==null);
+    return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null;
+  }
+  function wordStatus(w){
+    const data=learningData(w),attempts=exerciseTypes.filter(t=>Number(data.scores[t.id]?.count)>0);
+    if(!attempts.length)return 'new';
+    const practicedCore=['flash','match','write','sentence'].map(id=>data.scores[id]).filter(x=>x&&Number(x.count)>0);
+    const coreAvg=practicedCore.length?practicedCore.reduce((a,x)=>a+Number(x.average||0),0)/practicedCore.length:0;
+    const ready=practicedCore.length>=3&&coreAvg>=85;
+    data.status=ready?'ready':'learning';
+    return data.status;
+  }
+  function wordsForStatus(status){return S.words.filter(w=>wordStatus(w)===status).sort((a,b)=>a.word.localeCompare(b.word,undefined,{sensitivity:'base'}))}
+  function groupCards(){
+    const groups=[{key:'new',name:'Yangi so‘zlar',icon:'🟠',desc:'Flashcard, moslashtirish, yozish va tarjima'},{key:'learning',name:'O‘rganilayotgan so‘zlar',icon:'🔵',desc:'Zaif so‘zlarni mustahkamlash'},{key:'ready',name:'Ishlatishga tayyor so‘zlar',icon:'🟢',desc:'O‘zlashtirilgan so‘zlarni yana mashq qilish'}].map(g=>({...g,words:wordsForStatus(g.key)})).filter(g=>g.words.length);
+    return '<div class="group-task-list">'+groups.map((g,i)=>'<button class="group-task-card" onclick="startGroupTask(\''+g.key+'\')"><b>Task '+(i+1)+' · '+g.name+'</b><small>'+g.desc+'</small><span class="group-task-count">'+g.words.length+' ta so‘z</span></button>').join('')+'</div>';
+  }
+  function resultsCard(){return '<section class="panel"><div class="row spread"><div><div class="eyebrow">SHAXSIY RIVOJLANISH</div><h3 class="section-title" style="margin:5px 0">My Results · Mening natijalarim</h3><p class="subhead">Har bir so‘z bo‘yicha mashq natijalari.</p></div><button class="btn secondary small" onclick="openResults()">Ochish →</button></div></section>'}
+  home=function(){
+    let html=originalHome();
+    const start=html.indexOf('<section class="panel"><div class="eyebrow">BUGUNGI REJA</div>');
+    if(start>=0){const end=html.indexOf('</section>',start);if(end>=0)html=html.slice(0,start)+'<section class="panel"><div class="eyebrow">BUGUNGI VAZIFALAR</div><h3 class="section-title" style="margin:5px 0 12px">O‘rganish bosqichlari</h3>'+groupCards()+'</section>'+html.slice(end+10)}
+    const marker='</div>\n<div class="panel"><div class="quick">';
+    if(html.includes(marker))html=html.replace(marker,'</div>\n'+resultsCard()+'\n<div class="panel"><div class="quick">');
+    else html+=resultsCard();
+    return html;
+  };
+  tasksPage=function(){
+    const groups=[{key:'new',name:'Yangi so‘zlar'},{key:'learning',name:'O‘rganilayotgan so‘zlar'},{key:'ready',name:'Ishlatishga tayyor so‘zlar'}].map(g=>({...g,words:wordsForStatus(g.key)})).filter(g=>g.words.length);
+    return header('Bugungi vazifalar','Har bir bosqichda so‘zlar o‘z holatiga mos mashq qilinadi.')+'<div class="panel"><div class="progress-head"><span>So‘zlar bo‘yicha mashq</span><span class="percent">'+S.words.length+'</span></div><p class="subhead">Boshlash uchun bitta bosqichni tanlang. Har bir bosqich ichida mashqlar ketma-ket bajariladi.</p>'+groupCards()+'</div>';
+  };
+  function resultRow(w){
+    const status=wordStatus(w),avg=wordAverage(w),data=learningData(w);
+    const detail=exerciseTypes.map(t=>'<div class="result-detail-row"><span>'+t.label+'</span><b>'+(scoreFor(w,t.id)===null?'—':Math.round(scoreFor(w,t.id))+'%')+'</b></div>').join('');
+    return '<div class="result-word status-'+status+'" tabindex="0" onclick="this.classList.toggle(\'open\')" aria-label="'+esc(w.word)+' natijalari"><div class="result-word-main"><div class="result-word-name">'+esc(w.word)+'</div><div class="result-word-translation">'+esc(w.translation||'Tarjima mavjud emas')+' · '+statusText[status]+'</div></div><div class="result-word-average">'+(avg===null?'—':avg+'%')+'</div><div class="result-details"><div class="result-detail-row"><span>Holati</span><b>'+statusText[status]+'</b></div>'+detail+'<div class="result-detail-row"><span>Umumiy o‘rtacha</span><b>'+(avg===null?'—':avg+'%')+'</b></div></div></div>';
+  }
+  function resultsHTML(){
+    const groups=[{key:'new',title:'Yangi so‘zlar'},{key:'learning',title:'O‘rganilmoqda'},{key:'ready',title:'Erkin ishlatiladi'}];
+    return header('My Results · Mening natijalarim','Barcha so‘zlar va har bir mashq turi bo‘yicha o‘rtacha natijalar.')+'<section class="panel"><div class="results-legend"><span><i class="status-dot" style="background:#f3b64d"></i>Yangi so‘z</span><span><i class="status-dot" style="background:#6d9cff"></i>O‘rganilmoqda</span><span><i class="status-dot" style="background:#45d6a0"></i>Erkin ishlatiladi</span></div><input id="results-search" class="result-search" type="search" placeholder="So‘zlardan qidirish…" value="'+esc(resultFilter)+'" oninput="filterMyResults(this.value)"><div id="results-list">'+groups.map(g=>{const ws=wordsForStatus(g.key);return ws.length?'<h4 class="result-group-title">'+g.title+' ('+ws.length+')</h4>'+ws.map(resultRow).join(''):''}).join('')+'</div><p class="subhead">Foiz faqat bajarilgan mashqlar asosida hisoblanadi. Kursorni so‘z ustiga olib boring yoki so‘zni bosing — batafsil natijalar ochiladi.</p></section><div class="row"><button class="btn ghost" onclick="go(\'home\')">← Asosiy oynaga qaytish</button></div>';
+  }
+  render=function(){
+    if(page!=='results')return originalRender();
+    nav();const app=$('#app');app.innerHTML=resultsHTML();ensureThemeToggle();bindPage();if(typeof cloudRender==='function')cloudRender();
+  };
+  window.openResults=function(){resultFilter='';page='results';render();window.scrollTo({top:0,behavior:'smooth'})};
+  window.filterMyResults=function(value){
+    resultFilter=String(value||'');
+    const q=resultFilter.trim().toLocaleLowerCase();
+    const list=$('#results-list');if(!list)return;
+    list.innerHTML=[{key:'new',title:'Yangi so‘zlar'},{key:'learning',title:'O‘rganilmoqda'},{key:'ready',title:'Erkin ishlatiladi'}].map(g=>{const ws=wordsForStatus(g.key).filter(w=>(w.word+' '+w.translation).toLocaleLowerCase().includes(q));return ws.length?'<h4 class="result-group-title">'+g.title+' ('+ws.length+')</h4>'+ws.map(resultRow).join(''):''}).join('')||'<p class="subhead">Mos so‘z topilmadi.</p>';
+  };
+  function recordWordScores(id,pool){
+    const weights=taskWeights&&taskWeights[id];if(!weights||!Array.isArray(pool))return;
+    for(const w of pool){
+      if(!w)continue;
+      const errors=Number(weights.wrong?.[w.id]||0);
+      const current=Math.max(0,100-(Math.pow(2,errors)-1));
+      const data=learningData(w),old=data.scores[id],count=Number(old?.count||0),oldAvg=Number(old?.average||0);
+      data.scores[id]={average:Math.round((oldAvg*count+current)/(count+1)),count:count+1,lastScore:current,lastErrors:errors,lastAt:Date.now()};
+      data.status=wordStatus(w);
+    }
+  }
+  let dueWordsOriginal=dueWords;
+  startTask=function(id){
+    if(activeTaskWords){
+      const oldDue=dueWords;dueWords=function(){return activeTaskWords};
+      try{originalStartTask(id)}finally{dueWords=oldDue}
+      return;
+    }
+    originalStartTask(id);
+  };
+  window.startGroupTask=function(group){
+    const words=wordsForStatus(group);if(!words.length)return;
+    activeGroup=group;activeTaskWords=words;taskFlowIndex=0;
+    taskTransitionLabel=group==='new'?'YANGI SO‘ZLAR':group==='learning'?'O‘RGANILAYOTGAN SO‘ZLAR':'ISHLATISHGA TAYYOR SO‘ZLAR';
+    startTask('flash');
+    setTimeout(()=>{taskTransitionLabel='';if(page==='task')render()},1100);
+  };
+  taskView=function(){return (taskTransitionLabel?'<div class="task-transition"><div><strong>'+taskTransitionLabel+'</strong><small>Bugungi mashq boshlanmoqda</small></div></div>':'')+originalTaskView()};
+  finishTask=function(id,correct,total,miss){
+    const pools={flash:flash?.all,match:match?.all,write:write?.all,sentence:sentence?.all};
+    recordWordScores(id,pools[id]||activeTaskWords||[]);
+    if(activeTaskWords&&taskFlowIndex<3){
+      const savedRender=render;render=function(){};
+      try{originalFinishTask(id,correct,total,miss)}finally{render=savedRender}
+      taskFlowIndex++;
+      const next=['flash','match','write','sentence'][taskFlowIndex];
+      taskTransitionLabel=activeGroup==='new'?'YANGI SO‘ZLAR':activeGroup==='learning'?'O‘RGANILAYOTGAN SO‘ZLAR':'ISHLATISHGA TAYYOR SO‘ZLAR';
+      startTask(next);
+      setTimeout(()=>{taskTransitionLabel='';if(page==='task')render()},900);
+      return;
+    }
+    if(activeTaskWords){
+      const savedRender=render;render=function(){};
+      try{originalFinishTask(id,correct,total,miss)}finally{render=savedRender}
+      activeGroup=null;activeTaskWords=null;taskFlowIndex=0;taskTransitionLabel='';
+      page='result';render();return;
+    }
+    originalFinishTask(id,correct,total,miss);
+  };
+  // Add persistent per-word fields to words created before this feature.
+  S.words.forEach(w=>{learningData(w);wordStatus(w)});
+  const oldAddWord=addWord;
+  addWord=async function(fd){await oldAddWord(fd);S.words.forEach(w=>{learningData(w);wordStatus(w)});save()};
+  // Profile view should use the app's own title, not a host-derived title.
+  const oldProfilePage=profilePage;
+  profilePage=function(){document.title='Engliwords';return oldProfilePage()};
+  // Expose stable helpers for diagnostics and future conversation-practice integration.
+  window.engliwordsWordStatus=wordStatus;
+  window.engliwordsWordAverage=wordAverage;
+  window.engliwordsRecordConversationScore=function(wordId,score,errors=0){
+    const w=S.words.find(x=>x.id===wordId);if(!w)return false;
+    const data=learningData(w),id='conversation',current=Math.max(0,Math.min(100,Number(score)||0));
+    const old=data.scores[id],count=Number(old?.count||0),avg=Number(old?.average||0);
+    data.scores[id]={average:Math.round((avg*count+current)/(count+1)),count:count+1,lastScore:current,lastErrors:Math.max(0,Number(errors)||0),lastAt:Date.now()};
+    data.status=wordStatus(w);save();if(page==='results')render();return true;
+  };
+  render();
+})();
+</script>
+
 </body></html>
