@@ -468,15 +468,15 @@ function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').repla
 function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Mashq yakunlandi.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel"><div class="eyebrow">GAP TUZISH · AI AGENT</div><h3 class="section-title">${loading?'Gap tayyorlanmoqda…':failed?'Gapni tayyorlab bo‘lmadi':'AI agent gap tayyorlaydi'}</h3><p class="subhead">${loading?'Groq AI so‘z uchun o‘zbekcha gap va uning inglizcha tarjimasini tayyorlamoqda.':failed?('AI xatosi: '+esc(aiLastError||'Kalit, internet yoki API limitini tekshiring.')):'Gap rejimi uchun tayyor misol topilmadi. Agent avtomatik ravishda yangisini yaratadi.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Qayta urinish</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profil va API kaliti</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Iltimos, bir oz kuting.':'So‘z uchun yangi gap tuzilmoqda.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel"><div class="eyebrow">GAP TUZISH · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Asosiy so‘z: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Tekshirish</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
 async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
 function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
-async function aiGradeSentence(answer,target,word){
+async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'){
  if(!groqApiKey||!aiProvider)throw new Error('Profil bo‘limida Groq API kalitini ulang.');
- const messages=[
-  {role:'system',content:'Grade an Uzbek learner\'s English translation fairly. Accept natural synonyms and equivalent grammar. Judge meaning, grammar, and word choice; do not demand exact wording. Return JSON only: {"score":0,"corrected":"correct natural English","errors":["short error"],"feedback":"brief Uzbek note"}. score is integer 0-100. If correct, errors=[] and corrected may repeat the learner answer. Keep every text field very short. No detailed explanation.'},
-  {role:'user',content:'Target: '+JSON.stringify(target)+'\nVocabulary word: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+'\nReturn the score, corrected sentence, and only the main errors.'}
- ];
+ const needNext=!!(nextWord&&nextWord.word&&nextWord.translation&&!nextWord.examples?.easy?.en&&!nextWord.examples?.normal?.en&&!nextWord.examples?.hard?.en);
+ const system='Grade an Uzbek learner\'s English translation fairly. Accept natural synonyms and equivalent grammar. Return JSON only: {"score":0,"corrected":"short corrected English","errors":["brief main error"],"feedback":"brief Uzbek note"'+(needNext?',"nextExample":{"en":"short natural English sentence","uz":"natural Uzbek translation"}':'')+'}. Score 0-100. Keep fields short. No detailed explanation.';
+ const user='Target sentence: '+JSON.stringify(target)+'\nVocabulary: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+(needNext?'\nAlso create ONE short natural Uzbek sentence for English word '+JSON.stringify(nextWord.word)+' meaning '+JSON.stringify(nextWord.translation)+', at '+nextLevel+' level, and translate it to English. Include it as nextExample with en=English sentence and uz=Uzbek sentence.':'')+'\nReturn JSON only.';
+ const messages=[{role:'system',content:system},{role:'user',content:user}];
  const initialModel=aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b');
- const makeGradePayload=(model,maxTokens=420)=>{const p={model,messages,max_completion_tokens:maxTokens};if(/^qwen\/qwen3\./i.test(model)){p.reasoning_effort='none';p.temperature=0.1}else if(!/gpt-oss/i.test(model))p.temperature=0.1;return p};
- const requestGrade=async(model,maxTokens=420)=>aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(makeGradePayload(model,maxTokens))},25000);
+ const makeGradePayload=(model,maxTokens=needNext?520:320)=>{const p={model,messages,max_completion_tokens:maxTokens};if(/^qwen\/qwen3\./i.test(model)){p.reasoning_effort='none';p.temperature=0.1}else if(!/gpt-oss/i.test(model))p.temperature=0.1;return p};
+ const requestGrade=async(model,maxTokens=needNext?520:320)=>aiFetch(aiBase(aiProvider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+groqApiKey},body:JSON.stringify(makeGradePayload(model,maxTokens))},25000);
  let model=initialModel,data;
  try{data=await requestGrade(model)}
  catch(firstError){
@@ -491,8 +491,8 @@ async function aiGradeSentence(answer,target,word){
   for(const candidate of candidates){
    try{data=await requestGrade(candidate);model=candidate;success=true;break}
    catch(nextError){
-    lastError=nextError;const s=String(nextError?.message||'').toLowerCase();
-    const stillAccessError=((s.includes('403')||s.includes('forbidden'))&&/(blocked|organization|org level|project level|not allowed|permission|access denied|not authorized)/i.test(s))||(s.includes('400')&&/(model not found|unknown model|model unavailable|deprecated|model_not_found|invalid parameter|unsupported|not supported|temperature|token)/i.test(s));
+    lastError=nextError;const ss=String(nextError?.message||'').toLowerCase();
+    const stillAccessError=((ss.includes('403')||ss.includes('forbidden'))&&/(blocked|organization|org level|project level|not allowed|permission|access denied|not authorized)/i.test(ss))||(ss.includes('400')&&/(model not found|unknown model|model unavailable|deprecated|model_not_found|invalid parameter|unsupported|not supported|temperature|token)/i.test(ss));
     if(!stillAccessError)throw nextError;
    }
   }
@@ -500,28 +500,24 @@ async function aiGradeSentence(answer,target,word){
   aiModel=model;persistAiKey(groqApiKey,aiProvider,model);
  }
  let choice=data?.choices?.[0],raw=String(choice?.message?.content||'').trim();
- // Some reasoning models can consume a small output budget before emitting the JSON.
  if(!raw){
   console.warn('AI grade returned empty content:',{model,finish_reason:choice?.finish_reason,usage:data?.usage});
-  data=await requestGrade(model,650);
-  choice=data?.choices?.[0];
-  raw=String(choice?.message?.content||'').trim();
+  data=await requestGrade(model,needNext?700:450);
+  choice=data?.choices?.[0];raw=String(choice?.message?.content||'').trim();
  }
- if(!raw){
-  const reason=String(choice?.finish_reason||'unknown');
-  throw new Error('AI matnli baho qaytarmadi (finish_reason: '+reason+'). Bir marta avtomatik qayta urinildi; keyinroq qayta urinib ko‘ring.');
- }
+ if(!raw)throw new Error('AI matnli baho qaytarmadi (finish_reason: '+String(choice?.finish_reason||'unknown')+'). Keyinroq qayta urinib ko‘ring.');
  const first=raw.indexOf('{'),last=raw.lastIndexOf('}');
  if(first<0||last<=first)throw new Error('AI bahosining formati noto‘g‘ri. Qayta urinib ko‘ring.');
  const parsed=JSON.parse(raw.slice(first,last+1));
- let score=Number(parsed.score);
- if(!Number.isFinite(score))throw new Error('AI bahosi raqamli emas.');
- if(score>0&&score<=1)score*=100;
- const errors=Array.isArray(parsed.errors)?parsed.errors.filter(Boolean).slice(0,3).join('; '):'';
- const corrected=String(parsed.corrected||answer).trim();
- const note=String(parsed.feedback||'').trim();
+ let score=Number(parsed.score);if(!Number.isFinite(score))throw new Error('AI bahosi raqamli emas.');if(score>0&&score<=1)score*=100;
+ const errors=Array.isArray(parsed.errors)?parsed.errors.filter(Boolean).slice(0,2).join('; '):'';
+ const corrected=String(parsed.corrected||answer).trim(),note=String(parsed.feedback||'').trim();
  const feedback=[errors?'Xato: '+errors:'',corrected&&corrected.toLowerCase()!==String(answer).trim().toLowerCase()?'To‘g‘risi: '+corrected:'',note].filter(Boolean).join(' · ')||'Javob tekshirildi.';
- return {score:Math.max(0,Math.min(100,Math.round(score))),feedback};
+ let nextExample=null;
+ if(needNext&&parsed.nextExample&&String(parsed.nextExample.en||'').trim()&&String(parsed.nextExample.uz||'').trim()){
+  nextExample={en:String(parsed.nextExample.en).trim(),uz:String(parsed.nextExample.uz).trim()};
+ }
+ return {score:Math.max(0,Math.min(100,Math.round(score))),feedback,nextExample};
 }
 async function checkSentence(){
  const input=$('#sentence-answer'),val=input?.value.trim();
@@ -532,7 +528,10 @@ async function checkSentence(){
  if(button?.disabled)return;
  if(button){button.disabled=true;button.textContent='AI javobni tekshirmoqda…'}
  let result;
- try{result=await aiGradeSentence(val,ex.en,w.word)}
+ const nextWord=sentence.items[1]||null,nextLevel=nextWord?levelFor(nextWord):'easy';
+ try{result=await aiGradeSentence(val,ex.en,w.word,nextWord,nextLevel);
+  if(result.nextExample&&nextWord){nextWord.examples=nextWord.examples||{};nextWord.examples[nextLevel]=result.nextExample;save()}
+ }
  catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.warn('AI sentence grading failed:',aiLastError);if(button){button.disabled=false;button.textContent='Tekshirish'}toast('AI tekshira olmadi: '+aiLastError.slice(0,140));return}
  const score=result.score/100,correct=score>=0.70;
  if(correct){weightedCorrect('sentence',w.id);sentence.correct++;sentence.miss.delete(w.id)}else{weightedWrong('sentence',w.id);sentence.miss.add(w.id);sentence.retryCurrent=true}
