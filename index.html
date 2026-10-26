@@ -1272,10 +1272,9 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     recordWordScores(id,pools[id]||activeTaskWords);
     const p=progressFor(),weights=taskWeights&&taskWeights[id],earned=weights?.earned;
     const score=earned?Math.max(0,Math.min(100,Math.round(Object.values(earned).reduce((a,b)=>a+(Number(b)||0),0)))):(total?Math.round(correct/total*100):0);
-    const prior=p.modes[id],best=prior&&Number(prior.score)>score?prior:{score,correct,total,at:Date.now()};
-    p.modes[id]=best;p.tasks[id]=best;
-    const history=S.history[today()]||{};
-    history[id]={score,correct,total,passed:true};S.history[today()]=history;
+    const result={score,correct,total,at:Date.now()};
+    p.groupFlow.results=p.groupFlow.results||{};
+    p.groupFlow.results[id]=result;
     taskFlowIndex++;
     if(taskFlowIndex<4){
       p.groupFlow.index=taskFlowIndex;save();
@@ -1284,11 +1283,20 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
       setTimeout(()=>{taskTransitionLabel='';if(page==='task')render()},850);
       return;
     }
+    const history=S.history[today()]||{};
+    for(const mode of ['flash','match','write','sentence']){
+      const item=p.groupFlow.results[mode];
+      if(!item)continue;
+      p.modes[mode]=item;p.tasks[mode]=item;
+      history[mode]={score:item.score,correct:item.correct,total:item.total,passed:true};
+    }
+    S.history[today()]=history;
     markReviewed(activeTaskWords,new Set());
     p.score=Math.round(['flash','match','write','sentence'].reduce((sum,mode)=>sum+(Number(p.modes[mode]?.score)||0),0)/4);
+    const finalResult=p.groupFlow.results[id]||result;
     delete p.groupFlow;save();
     activeGroup=null;activeTaskWords=null;taskFlowIndex=0;taskTransitionLabel='';
-    matchState={id,correct,total,score,miss:[],passed:true};
+    matchState={id,correct:finalResult.correct,total:finalResult.total,score:finalResult.score,miss:[],passed:true};
     page='result';render();
   };
   // Add persistent per-word fields to words created before this feature.
