@@ -282,7 +282,7 @@ function bindPage(){if(page==='add'){const f=$('#add-form');if(f)f.onsubmit=asyn
 function addPage(){return `${header('So‘z qo‘shish','Inglizcha so‘zni yozing — o‘zbekcha tarjima avtomatik chiqadi.')}<form id="add-form" class="panel stack"><label class="fieldbox"><span class="field-label">Inglizcha so‘z</span><input class="field" name="word" required maxlength="100" placeholder="e.g. curious" autocomplete="off" onblur="autoTranslateWord(this.value)"></label><label class="fieldbox"><span class="field-label">Asosiy tarjima (avtomatik)</span><input class="field" id="auto-translation" name="translation" required maxlength="180" placeholder="Tarjima avtomatik chiqadi" readonly></label><label class="fieldbox"><span class="field-label">Qo‘shimcha tarjima (ixtiyoriy)</span><input class="field" name="customTranslation" maxlength="180" placeholder="O‘zingizning izoh yoki muqobil tarjimangiz"></label><label class="fieldbox"><span class="field-label">Ixtiyoriy o‘z misolingiz</span><textarea class="field" name="example" rows="2" placeholder="I am curious about space."></textarea></label><button class="btn primary full" type="submit">✦ So‘zni saqlash va AI gaplar tayyorlash</button><p class="subhead">AI misol gaplar uchun Profil bo‘limida Groq API kalitini kiriting.</p></form>`}
 async function addWord(fd){const word=String(fd.get('word')||'').trim(),translation=String(fd.get('translation')||'').trim(),customTranslation=String(fd.get('customTranslation')||'').trim(),example=String(fd.get('example')||'').trim();if(!word)return toast('Inglizcha so‘zni kiriting.');let auto=translation;if(!auto){try{auto=await lookupTranslation(word)}catch{ return toast('Tarjima olinmadi. Internetni tekshiring.')}}if(!auto)return toast('Tarjima olinmadi.');const finalTranslation=customTranslation?`${auto} (${customTranslation})`:auto;if(S.words.some(w=>w.word.toLocaleLowerCase()===word.toLocaleLowerCase()))return toast('Bu so‘z ro‘yxatda bor.');const w={id:uid(),word,translation:finalTranslation,added:today(),done:[],examples:{easy:example?{en:example,uz:''}:null,normal:null,hard:null}};S.words.push(w);const p=progressFor();if(!p.words.includes(w.id))p.words.push(w.id);save();render();toast('So‘z saqlandi. AI misollar tayyorlanmoqda…');if(example)w.examples.easy={en:example,uz:''};try{const ex=await aiExamples(word,finalTranslation);if(ex){w.examples={...w.examples,...ex};save();toast('Uch darajadagi misol gaplar tayyor!')}}catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.warn('Word example generation failed:',aiLastError);toast('So‘z saqlandi, ammo AI gaplari yaratilmadi: '+aiLastError.slice(0,100))}render()}
 function profilePage(){const user=cloud?.user||null;return `${header('Shaxsiy profil','O‘rganish jarayoningizni boshqaring.')}<section class="panel"><div class="row" style="gap:14px">${user?.picture?`<img class="avatar" style="width:62px;height:62px" src="${esc(user.picture)}" alt="Profil rasmi">`:`<div class="logo" style="width:62px;height:62px;border-radius:50%">${user?'◉':'🔐'}</div>`}<div style="flex:1"><h3 style="margin:0 0 4px">${esc(user?.name||'Google profiliga ulaning')}</h3><p class="subhead">${esc(user?.email||(cloud?.ready?'Google Drive ulangan':'Ma’lumotlar qurilmada saqlanadi'))}</p></div></div><div id="cloud-status" class="subhead" style="margin-top:14px">${cloud?.ready?'☁️ Google Drive bilan sinxronlash faol':user?'Profil eslab qolingan. Sinxronlash uchun Google ruxsati kerak bo‘lishi mumkin.':'Google akkaunt ulanmagan.'}</div><div id="cloud-actions" style="margin-top:12px">${user?`<button class="btn secondary full" onclick="cloudLogin()">☁️ Google Drive’ni ulash / yangilash</button>`:`<button class="btn primary full" onclick="cloudLogin()">Google orqali kirish</button>`}</div></section><section class="panel"><h3 class="section-title">Grok / Groq AI agenti</h3>${groqApiKey ? '<div style="border:1px solid #287f68;background:#12362f;border-radius:14px;padding:13px;margin:10px 0"><b style="color:var(--green)">✓ AI agent ulangan va faol</b><p class="subhead" style="margin:6px 0 0">AI API kaliti tekshirildi. Gap tuzish uchun tayyor.</p></div><button class="btn ghost" onclick="clearAiKey()">Kalitni almashtirish yoki uzish</button>' : '<p class="subhead">Gmail faqat Google/Drive kirishi uchun. Groq API kaliti (gsk_ bilan) sahifa yangilangandan keyin ham ushbu qurilmada va shu Google profiliga alohida saqlanadi. Umumiy yoki begona qurilmada kalitni saqlamang.</p><label class="fieldbox" style="display:block;margin-top:12px"><span class="field-label">Grok (xAI) yoki Groq API kaliti</span><input id="groq-key" class="field" type="password" autocomplete="off" placeholder="xai-… yoki gsk_…"></label><div class="row" style="margin-top:10px"><button id="groq-save-btn" class="btn primary" onclick="saveAiKey()">Ulash va tekshirish</button></div>'}<p class="subhead" style="margin-top:10px">Eslatma: kalit GitHub yoki Google Drive fayliga yozilmaydi, faqat ushbu brauzer xotirasida saqlanadi. Bu server darajasidagi maxfiy saqlash emas; qurilma umumiy bo‘lsa kalitni saqlamang.</p></section><section class="panel"><h3 class="section-title">Sozlamalar</h3><div class="settings-row"><div><b>Ovoz</b><div class="subhead">Tugma bosilganda yumshoq signal</div></div><input class="switch" type="checkbox" ${S.set.sound?'checked':''} onchange="S.set.sound=this.checked;save();haptic(this.checked);render()"></div><div class="settings-row"><div><b>Vibratsiya</b><div class="subhead">Telefon qo‘llab-quvvatlasa</div></div><input class="switch" type="checkbox" ${S.set.vib?'checked':''} onchange="S.set.vib=this.checked;save();render()"></div><div class="settings-row"><div><b>Zaxira nusxasi</b><div class="subhead">Lug‘atni JSON faylga saqlash</div></div><button class="btn ghost small" onclick="exportData()">Eksport</button></div><div class="settings-row"><div><b>Ma’lumotni tiklash</b><div class="subhead">Avvalgi zaxira faylidan</div></div><button class="btn ghost small" onclick="$('#import-file').click()">Import</button><input id="import-file" class="hide" type="file" accept="application/json" onchange="importData(this.files[0])"></div><div class="settings-row"><div><b>Chiqish</b><div class="subhead">Google profilini uzish</div></div><button class="btn danger small" onclick="confirmLogout()">Chiqish →</button></div></section>`}
-function translatorPage(){return `${header('Tarjimon','Matnni tarjima qiling, talaffuzini tinglang va misol gaplarni ko‘ring.')}<section class="panel translator-panel"><div class="row spread" style="margin-bottom:12px"><span class="badge">${translator.sl==='en'?'🇺🇸 English':'🇺🇿 O‘zbekcha'}</span><button id="swap" class="btn small">⇄ Almashtirish</button><span class="badge">${translator.tl==='uz'?'🇺🇿 O‘zbekcha':'🇺🇸 English'}</span></div><div class="translator"><div class="board"><label class="field-label">Matn</label><div class="translator-input-wrap"><textarea id="src" class="field" placeholder="Matnni kiriting…">${esc(translator.source||'')}</textarea><div id="spell-live" class="spell-live" role="status" aria-live="polite"></div><button id="read-src" class="translator-icon-btn" type="button" aria-label="Matnni ovoz chiqarib o‘qish" title="O‘qish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><button id="clear-translator" class="translator-icon-btn clear" type="button" aria-label="Matnni tozalash" title="Tozalash">×</button></div></div><div class="board"><label class="field-label">Tarjima</label><div class="translator-output-wrap"><div id="dst" class="field output">${esc(translator.result||'Tarjima shu yerda ko‘rinadi')}</div><button id="read-dst" class="translator-icon-btn" type="button" aria-label="Tarjimani ovoz chiqarib o‘qish" title="O‘qish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><button id="clear-result" class="translator-icon-btn clear" type="button" aria-label="Tarjimani tozalash" title="Tarjimani tozalash">×</button></div></div></div><button id="translator-add-word" class="btn full ${translatorCanAddWord()?'':'hide'}" style="margin-top:10px" onclick="addTranslatorWord()">📚 Lug‘atga qo‘shish</button><p class="subhead" style="margin-top:12px">Ovozli o‘qish brauzer imkoniyatiga bog‘liq. Aksent: <select class="field" style="display:inline-block;width:auto;padding:6px 9px" onchange="S.set.accent=this.value;save()"><option value="en-US" ${S.set.accent==='en-US'?'selected':''}>American English</option><option value="en-GB" ${S.set.accent==='en-GB'?'selected':''}>British English</option></select></p></section><section class="panel"><div class="eyebrow">EXAMPLE SENTENCES</div><h3 class="section-title" style="margin-top:5px">Misol gaplar</h3><div id="translator-examples">${translator.examples.length?translator.examples.map(x=>`<div class="example"><p>${esc(x.en||'')}</p><p class="subhead">${esc(x.uz||'')}</p></div>`).join(''):'<p class="subhead">Misol gaplar hozircha yo‘q. Matn tarjima qilinganda, mavjud bo‘lsa, misollar shu yerda ko‘rinadi.</p>'}</div></section>`}
+function translatorPage(){return `${header('Tarjimon','Matnni tarjima qiling, talaffuzini tinglang va misol gaplarni ko‘ring.')}<section class="panel translator-panel"><div class="row spread" style="margin-bottom:12px"><span class="badge">${translator.sl==='en'?'🇺🇸 English':'🇺🇿 O‘zbekcha'}</span><button id="swap" class="btn small">⇄ Almashtirish</button><span class="badge">${translator.tl==='uz'?'🇺🇿 O‘zbekcha':'🇺🇸 English'}</span></div><div class="translator"><div class="board"><label class="field-label">Matn</label><div class="translator-input-wrap"><textarea id="src" class="field" placeholder="Matnni kiriting…">${esc(translator.source||'')}</textarea><div id="spell-live" class="spell-live" role="status" aria-live="polite"></div><button id="mic-src" class="translator-icon-btn mic" type="button" aria-label="Ovoz orqali matn kiritish" title="Gapirib matn kiritish"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg></button><button id="read-src" class="translator-icon-btn read" type="button" aria-label="Matnni ovoz chiqarib o‘qish" title="O‘qish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><button id="clear-translator" class="translator-icon-btn clear" type="button" aria-label="Matnni tozalash" title="Tozalash">×</button></div></div><div class="board"><label class="field-label">Tarjima</label><div class="translator-output-wrap"><div id="dst" class="field output">${esc(translator.result||'Tarjima shu yerda ko‘rinadi')}</div></div></div></div><button id="translator-add-word" class="btn full ${translatorCanAddWord()?'':'hide'}" style="margin-top:10px" onclick="addTranslatorWord()">📚 Lug‘atga qo‘shish</button><p class="subhead" style="margin-top:12px">Ovozli o‘qish brauzer imkoniyatiga bog‘liq. Aksent: <select class="field" style="display:inline-block;width:auto;padding:6px 9px" onchange="S.set.accent=this.value;save()"><option value="en-US" ${S.set.accent==='en-US'?'selected':''}>American English</option><option value="en-GB" ${S.set.accent==='en-GB'?'selected':''}>British English</option></select></p></section><section class="panel"><div class="eyebrow">EXAMPLE SENTENCES</div><h3 class="section-title" style="margin-top:5px">Misol gaplar</h3><div id="translator-examples">${translator.examples.length?translator.examples.map(x=>`<div class="example"><p>${esc(x.en||'')}</p><p class="subhead">${esc(x.uz||'')}</p></div>`).join(''):'<p class="subhead">Misol gaplar hozircha yo‘q. Matn tarjima qilinganda, mavjud bo‘lsa, misollar shu yerda ko‘rinadi.</p>'}</div></section>`}
 function translatorCanAddWord(){const source=String(translator.source||'').trim();return translator.sl==='en'&&translator.tl==='uz'&&/^[A-Za-z][A-Za-z'’-]*$/.test(source)&&String(translator.result||'').trim().length>0&&!/[.!?\n]/.test(translator.result)}
 function wordEditDistance(a,b){a=String(a).toLowerCase();b=String(b).toLowerCase();if(Math.abs(a.length-b.length)>2)return 99;const dp=Array.from({length:a.length+1},(_,i)=>Array.from({length:b.length+1},(_,j)=>i===0?j:j===0?i:0));for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return dp[a.length][b.length]}
 async function addTranslatorWord(){
@@ -1020,4 +1020,98 @@ body[data-theme="day"]::after{animation:none}
 .bottom-nav button.active{background:linear-gradient(135deg,#a5ffe8,#63f3d0 55%,#39d9bb) !important;color:#06352f !important}
 body[data-theme="day"] .bottom-nav{background:rgba(255,255,255,.42) !important;border-color:rgba(255,255,255,.72) !important}
 </style>
+
+<style>
+/* Translator controls: clear at top, microphone bottom-left, read-aloud bottom-right. */
+body .app .translator-input-wrap{padding-top:0}
+body .app .translator-icon-btn.clear{top:9px;bottom:auto;left:auto;right:9px;width:32px;height:32px}
+body .app .translator-icon-btn.mic{left:9px;right:auto;bottom:9px}
+body .app .translator-icon-btn.read{left:auto;right:9px;bottom:9px}
+body .app #src{padding-top:48px;padding-bottom:52px}
+body .app #dst{padding-top:14px;padding-bottom:14px}
+body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135deg,#ff9ba8,#ff617b);color:#3b0811;border-color:#ffc0c8;animation:mic-pulse 1s ease-in-out infinite}
+@keyframes mic-pulse{50%{transform:scale(1.08);box-shadow:0 0 0 6px #ff6f8230}}
+</style>
+<script>
+/* Translator voice input and reliable language-specific speech output. */
+(function(){
+  let recognition = null;
+  function setMicState(listening){
+    const b=document.getElementById('mic-src');
+    if(!b)return;
+    b.classList.toggle('is-listening',!!listening);
+    b.title=listening?'Tinglayapti…':'Gapirib matn kiritish';
+    b.setAttribute('aria-label',listening?'Ovozni tinglash to‘xtatiladi':'Ovoz orqali matn kiritish');
+  }
+  function startMic(){
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){toast('Bu brauzer ovoz orqali matn kiritishni qo‘llamaydi. Chrome brauzerida sinab ko‘ring.');return}
+    if(recognition){try{recognition.stop()}catch{} recognition=null;setMicState(false);return}
+    recognition=new SpeechRecognition();
+    recognition.lang=translator.sl==='en'?(S.set.accent||'en-US'):'uz-UZ';
+    recognition.interimResults=false;
+    recognition.continuous=false;
+    recognition.onstart=()=>setMicState(true);
+    recognition.onresult=e=>{
+      const text=Array.from(e.results||[]).map(x=>x[0]?.transcript||'').join(' ').trim();
+      if(!text)return;
+      const src=document.getElementById('src');
+      if(src){src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));src.focus()}
+    };
+    recognition.onerror=e=>{
+      const messages={
+        'not-allowed':'Mikrofon ruxsati berilmadi. Brauzer sozlamalaridan mikrofon ruxsatini yoqing.',
+        'service-not-allowed':'Brauzer ovoz tanish xizmatiga ruxsat bermadi.',
+        'no-speech':'Ovoz aniqlanmadi. Yana urinib ko‘ring.',
+        'audio-capture':'Mikrofon topilmadi yoki boshqa dastur foydalanmoqda.',
+        'network':'Ovozni aniqlash xizmati uchun internet aloqasini tekshiring.'
+      };
+      if(e.error!=='aborted')toast(messages[e.error]||'Ovozni aniqlashda xatolik yuz berdi.');
+    };
+    recognition.onend=()=>{recognition=null;setMicState(false)};
+    try{recognition.start()}catch(e){recognition=null;setMicState(false);toast('Mikrofonni ishga tushirib bo‘lmadi. Qayta urinib ko‘ring.')}
+  }
+  document.addEventListener('click',e=>{
+    if(e.target.closest('#mic-src')){e.preventDefault();startMic()}
+  });
+  /* Wait for browser voices to load; never silently use an Uzbek voice for English. */
+  speak=async function(text,lang){
+    if(!('speechSynthesis' in window))return toast('Bu brauzer ovozli o‘qishni qo‘llamaydi.');
+    const t=String(text||'').trim();
+    if(!t)return toast('O‘qish uchun matn yo‘q.');
+    const synth=window.speechSynthesis;
+    synth.cancel();
+    let voices=synth.getVoices();
+    if(!voices.length){
+      await Promise.race([
+        new Promise(resolve=>synth.addEventListener('voiceschanged',resolve,{once:true})),
+        new Promise(resolve=>setTimeout(resolve,1200))
+      ]);
+      voices=synth.getVoices();
+    }
+    const isEnglish=lang==='en';
+    const requested=isEnglish?(S.set.accent||'en-US'):'uz-UZ';
+    let voice=null;
+    if(isEnglish){
+      voice=voices.find(v=>v.lang.toLowerCase()===requested.toLowerCase())
+        ||voices.find(v=>/^en([-_]|$)/i.test(v.lang));
+      if(voices.length&&!voice){
+        toast('Qurilmada inglizcha ovoz topilmadi. Windows yoki brauzerda English speech voice mavjudligini tekshiring.');
+        return;
+      }
+    }else{
+      voice=voices.find(v=>/^uz([-_]|$)/i.test(v.lang))||null;
+    }
+    const utterance=new SpeechSynthesisUtterance(t);
+    utterance.lang=requested;
+    if(voice)utterance.voice=voice;
+    utterance.rate=0.92;
+    utterance.onerror=e=>{
+      if(e.error!=='canceled'&&e.error!=='interrupted')toast(isEnglish?'Inglizcha ovoz ishlamadi. Qurilmadagi English speech voice sozlamalarini tekshiring.':'Ovozli o‘qish bajarilmadi.');
+    };
+    synth.speak(utterance);
+  };
+})();
+</script>
+
 </body></html>
