@@ -1384,13 +1384,13 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
  function apply(){const lang=get();document.documentElement.lang=lang;const dict=words[lang];if(!dict)return;
  [document.querySelector("#app"),document.querySelector("#nav")].filter(Boolean).forEach(root=>{
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const list=[];while(walker.nextNode())list.push(walker.currentNode);
-  list.forEach(n=>{const p=n.parentElement;if(!p||/^(SCRIPT|STYLE|TEXTAREA|INPUT|OPTION|CODE)$/.test(p.tagName)||p.closest(".result-word,.example,#dst,#src,.flash-word,.word-result-modal,.translator"))return;const raw=n.nodeValue,t=raw.trim();if(dict[t])n.nodeValue=raw.replace(t,dict[t])});
+  list.forEach(n=>{const p=n.parentElement;if(!p||/^(SCRIPT|STYLE|TEXTAREA|INPUT|OPTION|CODE)$/.test(p.tagName)||p.closest(".result-word,.example,#dst,#src,.flash-word,.word-result-modal"))return;const raw=n.nodeValue,t=raw.trim();if(dict[t])n.nodeValue=raw.replace(t,dict[t])});
   root.querySelectorAll("[placeholder]").forEach(e=>{if(dict[e.placeholder])e.placeholder=dict[e.placeholder]});
   root.querySelectorAll("[title]").forEach(e=>{if(dict[e.title])e.title=dict[e.title]});
  });
 }
  const baseProfile=profilePage;
- profilePage=function(){const html=baseProfile();const lang=get();return html+'<section class="panel"><h3 class="section-title">Interface language</h3><div class="settings-row"><div><b>Choose app language</b><div class="subhead">Changes the interface language on this device.</div></div><select id="ui-language" class="field" style="max-width:150px"><option value="uz" '+(lang==="uz"?"selected":"")+ '>O‘zbekcha</option><option value="en" '+(lang==="en"?"selected":"")+ '>English</option><option value="ru" '+(lang==="ru"?"selected":"")+ '>Русский</option></select></div></section>'};
+ profilePage=function(){const html=baseProfile(),lang=get(),title=lang==="uz"?"Interfeys tili":lang==="ru"?"Язык интерфейса":"Interface language",label=lang==="uz"?"Ilova tilini tanlang":lang==="ru"?"Выберите язык приложения":"Choose app language",hint=lang==="uz"?"Bu qurilmadagi interfeys tilini o‘zgartiradi.":lang==="ru"?"Меняет язык интерфейса на этом устройстве.":"Changes the interface language on this device.";return html+'<section class="panel"><h3 class="section-title">'+title+'</h3><div class="settings-row"><div><b>'+label+'</b><div class="subhead">'+hint+'</div></div><select id="ui-language" class="field" style="max-width:150px"><option value="uz" '+(lang==="uz"?"selected":"")+ '>O‘zbekcha</option><option value="en" '+(lang==="en"?"selected":"")+ '>English</option><option value="ru" '+(lang==="ru"?"selected":"")+ '>Русский</option></select></div></section>'};
  const baseRender=render;
  render=function(){baseRender();const select=document.querySelector("#ui-language");if(select)select.addEventListener("change",function(){try{localStorage.setItem("engliwords-ui-language",this.value)}catch(e){};render()});apply()};
  window.engliwordsGetLanguage=get;
