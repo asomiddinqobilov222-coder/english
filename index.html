@@ -1355,4 +1355,42 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
 @keyframes tasks-flash-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.1)}18%{opacity:.95}100%{opacity:0;transform:translate(-50%,-50%) scale(15)}}
 @media(prefers-reduced-motion:reduce){.tasks-empty-message,.tasks-fullscreen-fireworks *{animation:none!important;opacity:1}.tasks-fullscreen-fireworks{display:none}}
 </style>
-<style id="engliwords-translator-controls">.translator-icon-btn.translate{right:10px;bottom:10px;font-size:23px;font-weight:800}.translator-input-wrap{padding-bottom:48px}.translator-output-wrap{position:relative;padding-bottom:42px}.translator-icon-btn.output-read{position:absolute;right:10px;bottom:5px;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#24334d;border:1px solid var(--line)}.translator-icon-btn.hide{display:none!important}</style></body></html>
+<style id="engliwords-translator-controls">.translator-icon-btn.translate{right:10px;bottom:10px;font-size:23px;font-weight:800}.translator-input-wrap{padding-bottom:48px}.translator-output-wrap{position:relative;padding-bottom:42px}.translator-icon-btn.output-read{position:absolute;right:10px;bottom:5px;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#24334d;border:1px solid var(--line)}.translator-icon-btn.hide{display:none!important}</style><script id="engliwords-language-selector-patch">
+(function(){
+ const words={en:{
+ "Asosiy":"Home","Vazifalar":"Tasks","Tarjimon":"Translator","Profil":"Profile","Sozlamalar":"Settings",
+ "Shaxsiy profil":"Personal profile","Sozlamalar va hisob":"Settings and account","So‘z qo‘shish":"Add words",
+ "Kunlik zanjir":"Daily streak","So‘zlar ro‘yxati":"Word list","Bugungi so‘zlar":"Words due today",
+ "Bugun o‘zingni rivojlantir":"Grow a little every day","Mashq grafigi":"Practice chart","Yangi so‘z":"New word",
+ "O‘rganilmoqda":"Learning","Erkin ishlatiladi":"Ready to use","Lug‘atga qo‘shish":"Add to dictionary",
+ "Matnni kiriting…":"Enter text…","Matn":"Text","Tarjima":"Translation","Tarjima qilish":"Translate",
+ "Almashtirish":"Swap","Ovoz":"Sound","Vibratsiya":"Vibration","Eksport":"Export","Import":"Import",
+ "Chiqish":"Sign out","Ovozli o‘qish brauzer imkoniyatiga bog‘liq.":"Speech depends on browser support.",
+ "Misol gaplar":"Example sentences","Bugun uchun so‘z yo‘q. Lug‘atga yangi so‘z qo‘shishingiz mumkin.":"No words due today. Add a word to your dictionary.",
+ "So‘zlardan qidirish…":"Search words…","Mos so‘z topilmadi.":"No matching words found.","Holati":"Status",
+ "Umumiy o‘rtacha":"Overall average","Interface language":"Interface language","Choose app language":"Choose app language",
+ "Changes the interface language on this device.":"Changes the interface language on this device."
+ },ru:{
+ "Asosiy":"Главная","Vazifalar":"Задания","Tarjimon":"Переводчик","Profil":"Профиль","Sozlamalar":"Настройки",
+ "Shaxsiy profil":"Личный профиль","Sozlamalar va hisob":"Настройки и аккаунт","So‘z qo‘shish":"Добавить слова",
+ "Kunlik zanjir":"Серия дней","So‘zlar ro‘yxati":"Список слов","Bugungi so‘zlar":"Слова на сегодня",
+ "Mashq grafigi":"График занятий","Yangi so‘z":"Новое слово","O‘rganilmoqda":"Изучается",
+ "Erkin ishlatiladi":"Готово к использованию","Lug‘atga qo‘shish":"Добавить в словарь",
+ "Matnni kiriting…":"Введите текст…","Matn":"Текст","Tarjima":"Перевод","Tarjima qilish":"Перевести",
+ "Almashtirish":"Поменять местами","Ovoz":"Звук","Vibratsiya":"Вибрация","Eksport":"Экспорт","Import":"Импорт",
+ "Chiqish":"Выйти","Misol gaplar":"Примеры предложений","Holati":"Статус","Umumiy o‘rtacha":"Общее среднее"
+ }};
+ const get=()=>{try{return localStorage.getItem("engliwords-ui-language")||"uz"}catch(e){return"uz"}};
+ function apply(){const lang=get();document.documentElement.lang=lang;const dict=words[lang];if(!dict)return;const root=document.querySelector("#app");if(!root)return;
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const list=[];while(walker.nextNode())list.push(walker.currentNode);
+ list.forEach(n=>{const p=n.parentElement;if(!p||/^(SCRIPT|STYLE|TEXTAREA|INPUT|OPTION|CODE)$/.test(p.tagName)||p.closest(".result-word,.example,#dst,#src,.flash-word,.word-result-modal"))return;const raw=n.nodeValue,t=raw.trim();if(dict[t])n.nodeValue=raw.replace(t,dict[t])});
+ root.querySelectorAll("[placeholder]").forEach(e=>{if(dict[e.placeholder])e.placeholder=dict[e.placeholder]});root.querySelectorAll("[title]").forEach(e=>{if(dict[e.title])e.title=dict[e.title]});
+ }
+ const baseProfile=profilePage;
+ profilePage=function(){const html=baseProfile();const lang=get();return html+'<section class="panel"><h3 class="section-title">Interface language</h3><div class="settings-row"><div><b>Choose app language</b><div class="subhead">Changes the interface language on this device.</div></div><select id="ui-language" class="field" style="max-width:150px"><option value="uz" '+(lang==="uz"?"selected":"")+ '>O‘zbekcha</option><option value="en" '+(lang==="en"?"selected":"")+ '>English</option><option value="ru" '+(lang==="ru"?"selected":"")+ '>Русский</option></select></div></section>'};
+ const baseRender=render;
+ render=function(){baseRender();const select=document.querySelector("#ui-language");if(select)select.addEventListener("change",function(){try{localStorage.setItem("engliwords-ui-language",this.value)}catch(e){};render()});apply()};
+ window.engliwordsGetLanguage=get;
+ const observer=new MutationObserver(apply);observer.observe(document.querySelector("#app")||document.body,{childList:true,subtree:true,characterData:true});apply();
+})();
+</script></body></html>
