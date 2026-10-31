@@ -322,7 +322,7 @@ async function aiFetch(url,options={},timeoutMs=20000){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
   if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
-  if(!window.supabaseClient?.auth)throw new Error('Avval Google orqali tizimga kiring.');
+  if(typeof supabaseClient==='undefined'||!supabaseClient?.auth)throw new Error('Avval Google orqali tizimga kiring.');
   const {data:{session},error}=await supabaseClient.auth.getSession();
   if(error||!session?.access_token)throw new Error('AI ishlashi uchun Google akkauntingizga qayta kiring.');
   const original=new URL(url,location.href);
