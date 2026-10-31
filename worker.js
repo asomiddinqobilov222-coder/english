@@ -15,6 +15,8 @@ const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-cont
 function json(data,status=200,extra={}){return new Response(JSON.stringify(data),{status,headers:{...JSON_HEADERS,...extra}})}
 export default {
  async fetch(request,env){
+  const path=new URL(request.url).pathname;
+  if(path!=='/models'&&path!=='/chat/completions')return env.ASSETS.fetch(request);
   const origin=request.headers.get('Origin')||'';
   const allowed=[...DEFAULT_ORIGINS,...String(env.APP_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean)];
   const cors={'access-control-allow-origin':allowed.includes(origin)?origin:'null','access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin'};
