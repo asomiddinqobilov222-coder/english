@@ -209,29 +209,15 @@ const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random
 const defaults=()=>({words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:'en-US'},history:{}});
 // Lug‘at va progress faqat autentifikatsiyalangan Supabase akkauntidan yuklanadi.
 let S=defaults();
-let groqApiKey='';
-let aiProvider='';
-let aiModel='';
+let groqApiKey='server-managed';
+let aiProvider='groq';
+let aiModel='openai/gpt-oss-20b';
 let aiLastError='';
-const AI_KEY_PREFIX='eng-ai-key:';
-function aiStorageKey(){
- const identity=cloud?.user?.sub||cloud?.user?.email;
- return AI_KEY_PREFIX+encodeURIComponent(String(identity||'local').trim().toLowerCase());
-}
 function restoreAiKeyForCurrentProfile(){
- groqApiKey='';aiProvider='';aiModel='';aiLastError='';
- try{
-  const saved=JSON.parse(localStorage.getItem(aiStorageKey())||'null');
-  if(saved&&typeof saved.key==='string'&&saved.key){
-   groqApiKey=saved.key;aiProvider=String(saved.provider||'');aiModel=String(saved.model||'');
-  }
- }catch{}
+ // API kaliti endi brauzerda saqlanmaydi; Cloudflare Worker boshqaradi.
+ try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k&&k.startsWith('eng-ai-key:'))localStorage.removeItem(k)}}catch{}
 }
-function persistAiKey(key,provider,model){
- groqApiKey=String(key||'');aiProvider=provider||'';aiModel=model||'';aiLastError='';
- try{localStorage.setItem(aiStorageKey(),JSON.stringify({key:groqApiKey,provider:aiProvider,model:aiModel,updatedAt:Date.now()}))}
- catch(e){console.warn('AI kalitini saqlab bo‘lmadi:',e);toast('AI kaliti ushbu qurilmada saqlanmadi. Brauzer xotirasini tekshiring.')}
-}
+function persistAiKey(_key,provider,model){aiProvider='groq';if(model)aiModel=model;aiLastError='';}
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),lastReviewedOn:String(w.lastReviewedOn||w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
@@ -331,20 +317,25 @@ async function translateText(silent=false){const textIn=$('#src')?.value.trim();
 function speak(text,lang){if(!('speechSynthesis'in window))return toast('Bu brauzer ovozli o‘qishni qo‘llamaydi.');const t=String(text||'').trim();if(!t)return toast('O‘qish uchun matn yo‘q.');speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=lang==='en'?(S.set.accent||'en-US'):'uz-UZ';const voices=speechSynthesis.getVoices();if(lang==='en'){const v=voices.find(v=>v.lang===u.lang)||voices.find(v=>v.lang.startsWith('en'));if(v)u.voice=v}speechSynthesis.speak(u)}
 async function lookupTranslation(word){const u=new URL('https://translate.googleapis.com/translate_a/single');u.searchParams.set('client','gtx');u.searchParams.set('sl','en');u.searchParams.set('tl','uz');u.searchParams.set('dt','t');u.searchParams.set('q',word);const r=await fetch(u);if(!r.ok)throw Error('translate');const d=await r.json();return (d[0]||[]).map(x=>x[0]||'').join('').trim()}
 let translationTimer=null;function autoTranslateWord(word){clearTimeout(translationTimer);const el=$('#auto-translation');if(!el)return;const value=String(word||'').trim();if(!value){el.value='';return}translationTimer=setTimeout(async()=>{try{el.value=await lookupTranslation(value)}catch{el.value=''}},250)}
-function aiBase(provider){return provider==='xai'?'https://api.x.ai/v1':'https://api.groq.com/openai/v1'}
+function aiBase(_provider){return AI_PROXY_URL;}
 async function aiFetch(url,options={},timeoutMs=20000){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
-  const response=await fetch(url,{...options,signal:controller.signal}),raw=await response.text();
-  let data=null;try{data=raw?JSON.parse(raw):{}}catch{}
-  if(!response.ok){const detail=String(data?.error?.message||data?.message||raw||('HTTP '+response.status)).replace(/\s+/g,' ').slice(0,260);throw new Error('HTTP '+response.status+' — '+detail)}
+  if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
+  if(typeof supabaseClient==='undefined'||!supabaseClient?.auth)throw new Error('Avval Google orqali tizimga kiring.');
+  const {data:{session},error}=await supabaseClient.auth.getSession();
+  if(error||!session?.access_token)throw new Error('AI ishlashi uchun Google akkauntingizga qayta kiring.');
+  const original=new URL(url,location.href);
+  const path=original.pathname.endsWith('/models')?'/models':'/chat/completions';
+  const headers=new Headers(options.headers||{});
+  headers.delete('Authorization');headers.set('Authorization','Bearer '+session.access_token);headers.set('Content-Type','application/json');
+  const response=await fetch(AI_PROXY_URL.replace(/\/$/,'')+path,{...options,headers,signal:controller.signal});
+  const raw=await response.text();let data=null;try{data=raw?JSON.parse(raw):{}}catch{}
+  if(!response.ok){const detail=String(data?.error?.message||data?.error||data?.message||raw||('HTTP '+response.status)).replace(/\s+/g,' ').slice(0,240);throw new Error('HTTP '+response.status+' — '+detail)}
   if(!data)throw new Error('AI serveri JSON formatida javob bermadi.');
   return data;
- }catch(e){
-  if(e?.name==='AbortError')throw new Error('AI so‘rovi 20 soniyada javob bermadi. Qayta urinib ko‘ring.');
-  if(e instanceof TypeError)throw new Error('AI serveriga ulanish bo‘lmadi. Internetni tekshiring; brauzer CORS cheklovi ham sabab bo‘lishi mumkin.');
-  throw e;
- }finally{clearTimeout(timer)}
+ }catch(e){if(e?.name==='AbortError')throw new Error('AI so‘rovi vaqt tugagani uchun to‘xtadi. Qayta urinib ko‘ring.');if(e instanceof TypeError)throw new Error('AI serveriga ulanish bo‘lmadi. Worker sozlamalarini tekshiring.');throw e}
+ finally{clearTimeout(timer)}
 }
 function aiModelFromList(provider,data){
  const ids=(Array.isArray(data?.data)?data.data:Array.isArray(data?.models)?data.models:[]).map(x=>String(x?.id||x?.name||'')).filter(Boolean);
@@ -357,28 +348,16 @@ function aiModelFromList(provider,data){
  // Audio generation and prompt-guard models cannot create the app's text answers.
  return ids.find(id=>id!=='openai/gpt-oss-120b'&&!/(whisper|guard|embed|speech|tts|vision|image|audio|orpheus|arabic|realtime|video|transcri|diariz)/i.test(id))||'';
 }
-async function testAiProvider(key,provider){
- const data=await aiFetch(aiBase(provider)+'/models',{headers:{Authorization:'Bearer '+key}},15000),model=aiModelFromList(provider,data);
- if(!model)throw new Error(provider==='groq'?'Groq loyihangizda matn yaratadigan model yoqilmagan. Groq Console → Project → Model Permissions bo‘limida qwen/qwen3.8-27b yoki openai/gpt-oss-20b kabi chat modelini yoqing. Orpheus audio modeli va Prompt Guard matn yaratish o‘rnini bosa olmaydi.':'Ushbu provayderda matn modeli topilmadi.');
+async function testAiProvider(){
+ const data=await aiFetch(AI_PROXY_URL+'/models',{},15000),model=aiModelFromList('groq',data);
+ if(!model)throw new Error('Groq’da chat modeli topilmadi.');
  return model;
 }
 async function saveAiKey(){
- const input=$('#groq-key'),key=String(input?.value||'').trim();
- if(!key)return toast('Grok yoki Groq API kalitini kiriting. Gmail manzili API kaliti emas.');
- const btn=$('#groq-save-btn');
- if(btn){btn.disabled=true;btn.textContent='API kaliti tekshirilmoqda…'}
- try{
-  let provider=/^xai-/i.test(key)?'xai':/^gsk_/i.test(key)?'groq':'',model='';
-  if(provider)model=await testAiProvider(key,provider);
-  else{try{provider='xai';model=await testAiProvider(key,provider)}catch(first){provider='groq';try{model=await testAiProvider(key,provider)}catch(second){throw new Error('Kalit Grok (xAI) yoki Groq API kaliti sifatida tekshirilmadi. '+(second.message||first.message))}}}
-  persistAiKey(key,provider,model);
-  // Kalitni tekshirishda qimmat 3 ta misol yaratmaymiz; qisqa chat ping yetarli.
-  const ping=await aiFetch(aiBase(provider)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'Reply OK only.'}],max_completion_tokens:16,...(/^qwen\/qwen3\./i.test(model)?{reasoning_effort:'none'}:{})})},15000);
-  if(!String(ping?.choices?.[0]?.message?.content||'').trim())throw new Error('AI modeli javob qaytarmadi.');
-  toast('✓ '+(provider==='xai'?'Grok (xAI)':'Groq')+' gap tuzish sinovidan o‘tdi. Model: '+model);render();
- }catch(e){aiLastError=e?.message||'Noma’lum xato';console.warn('AI key validation failed:',aiLastError);try{localStorage.removeItem(aiStorageKey())}catch{}groqApiKey='';aiProvider='';aiModel='';toast('AI gap tuzish sinovidan o‘tmadi: '+aiLastError.slice(0,150));if(btn){btn.disabled=false;btn.textContent='Ulash va tekshirish'}const err=$('#ai-key-error');if(err)err.textContent='Sinov muvaffaqiyatsiz: '+aiLastError}
+ try{aiModel=await testAiProvider();aiProvider='groq';groqApiKey='server-managed';toast('AI serveri ulandi.');render()}
+ catch(e){toast('AI serveri hozircha ishlamayapti: '+String(e.message||e).slice(0,150))}
 }
-function clearAiKey(){try{localStorage.removeItem(aiStorageKey())}catch{}groqApiKey='';aiProvider='';aiModel='';aiLastError='';toast('AI API kaliti ushbu Google profiliga tegishli qurilma xotirasidan o‘chirildi.');render()}
+function clearAiKey(){toast('AI kaliti Cloudflare’da xavfsiz saqlanadi.');}
 function parseExamples(raw){
  let text=String(raw||'').trim();
  if(text.startsWith('```')){text=text.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim()}
@@ -392,7 +371,7 @@ function parseExamples(raw){
  return out;
 }
 async function aiExamples(word,translation){
- if(!groqApiKey||!aiProvider)throw new Error('AI API kaliti ulanmagan. Profil bo‘limida Grok/Groq kalitini kiriting.');
+ if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
  const safeWord=String(word||'').trim(),safeTranslation=String(translation||'').trim();
  if(!safeWord||!safeTranslation)throw new Error('So‘z yoki o‘zbekcha tarjima bo‘sh.');
  const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must use the target word or a natural inflected form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural Uzbek translation of the whole sentence. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Uzbek translation"},"normal":{"en":"English sentence","uz":"Uzbek translation"},"hard":{"en":"English sentence","uz":"Uzbek translation"}}}. No markdown, no extra text.';
@@ -468,7 +447,7 @@ function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="pane
 async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Noma’lum AI xatosi';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
 function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
 async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'){
- if(!groqApiKey||!aiProvider)throw new Error('Profil bo‘limida Groq API kalitini ulang.');
+ if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
  const needNext=!!(nextWord&&nextWord.word&&nextWord.translation&&!nextWord.examples?.easy?.en&&!nextWord.examples?.normal?.en&&!nextWord.examples?.hard?.en);
  const system='Grade an Uzbek learner\'s English translation fairly. Accept natural synonyms and equivalent grammar. Return JSON only: {"score":0,"corrected":"short corrected English","errors":["brief main error"],"feedback":"brief Uzbek note"'+(needNext?',"nextExample":{"en":"short natural English sentence","uz":"natural Uzbek translation"}':'')+'}. Score 0-100. Keep fields short. No detailed explanation.';
  const user='Target sentence: '+JSON.stringify(target)+'\nVocabulary: '+JSON.stringify(word||'')+'\nLearner answer: '+JSON.stringify(answer)+(needNext?'\nAlso create ONE short natural Uzbek sentence for English word '+JSON.stringify(nextWord.word)+' meaning '+JSON.stringify(nextWord.translation)+', at '+nextLevel+' level, and translate it to English. Include it as nextExample with en=English sentence and uz=Uzbek sentence.':'')+'\nReturn JSON only.';
@@ -660,9 +639,13 @@ window.confirmTranslatorWord=function(){
 
 /* 11: profil */
 const _prof=profilePage;
-profilePage=function(){const d=document.createElement('div');d.innerHTML=_prof();d.querySelector('.screen-title')?.remove();const s=d.querySelectorAll('section');s[0]?.remove();s[1]?.remove();
- const ai=groqApiKey?`<section class="panel ai-row"><b>AI agent faol</b><button class="btn ghost small" onclick="clearAiKey()">Uzish</button></section>`:`<section class="panel ai-row"><input id="groq-key" class="field" type="password" autocomplete="off" placeholder="API kalit"><button id="groq-save-btn" class="btn primary small" onclick="saveAiKey()">Ulash</button></section>`;
- return ai+d.innerHTML};
+profilePage=function(){
+ const d=document.createElement('div');d.innerHTML=_prof();
+ d.querySelector('.screen-title')?.remove();
+ d.querySelectorAll('section').forEach(el=>{if(el.querySelector('#groq-key')||/Grok \/ Groq AI agenti/.test(el.textContent||''))el.remove()});
+ const ai='<section class="panel ai-row"><b>AI xizmati</b><p class="subhead">AI kaliti serverda xavfsiz saqlanadi; foydalanuvchidan API kaliti talab qilinmaydi.</p></section>';
+ return ai+d.innerHTML
+};
 function cleanProfile(){const run=()=>document.querySelectorAll('#app > *').forEach(el=>{if(/Supabase|Hozir saqlash|sinxron/i.test(el.textContent||''))el.remove()});run();setTimeout(run,300);setTimeout(run,1200)}
 
 const _render=render;
