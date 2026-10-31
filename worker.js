@@ -15,6 +15,7 @@ const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-cont
 function json(data,status=200,extra={}){return new Response(JSON.stringify(data),{status,headers:{...JSON_HEADERS,...extra}})}
 export default {
  async fetch(request,env){
+  const path=new URL(request.url).pathname;
   if(path!=='/models'&&path!=='/chat/completions')return env.ASSETS.fetch(request);
   const origin=request.headers.get('Origin')||'';
   const allowed=[...DEFAULT_ORIGINS,...String(env.APP_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean)];
@@ -30,7 +31,6 @@ export default {
    const verify=await fetch(env.SUPABASE_URL.replace(/\/$/,'')+'/auth/v1/user',{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:auth}});
    if(!verify.ok)return json({error:'Session expired; sign in again'},401,cors);
   }catch{return json({error:'Could not verify sign-in'},502,cors)}
-  const path=new URL(request.url).pathname;
   if(path!=='/models'&&path!=='/chat/completions')return json({error:'Not found'},404,cors);
   if(path==='/models'&&request.method!=='GET')return json({error:'GET required'},405,cors);
   if(path==='/chat/completions'&&request.method!=='POST')return json({error:'POST required'},405,cors);
