@@ -16,7 +16,10 @@ function json(data,status=200,extra={}){return new Response(JSON.stringify(data)
 export default {
  async fetch(request,env){
   const path=new URL(request.url).pathname;
-  if(path!=='/models'&&path!=='/chat/completions')return env.ASSETS.fetch(request);
+  if(path!=='/models'&&path!=='/chat/completions'){
+   if(env.ASSETS&&typeof env.ASSETS.fetch==='function')return env.ASSETS.fetch(request);
+   return new Response('Engliwords AI proxy is running. Use /models or /chat/completions.',{status:404,headers:{'content-type':'text/plain; charset=utf-8'}});
+  }
   const origin=request.headers.get('Origin')||'';
   const allowed=[...DEFAULT_ORIGINS,...String(env.APP_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean)];
   const cors={'access-control-allow-origin':allowed.includes(origin)?origin:'null','access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin'};
