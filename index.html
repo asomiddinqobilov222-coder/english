@@ -1553,10 +1553,14 @@ body .app .translator-action-row .translator-icon-btn.mic.is-listening{backgroun
   const safeRoots=['#app','#nav','#modal-root','#toast'];
   const ignored='.result-word,.result-word-name,.result-word-translation,.example,#dst,#src,.flash-word,.flashcard-word,.word-result-modal,.user-content,[data-user-content="true"],script,style,textarea,input,select,option,code';
   function translateString(value,lang){
-    if(!value||lang==='uz')return value;
+    if(!value)return value;
     let out=String(value);
-    const rev=reverse[lang]||{};
-    Object.keys(rev).sort((a,b)=>b.length-a.length).forEach(t=>{out=out.split(t).join(rev[t])});
+    // Normalize text from either previously selected language back to Uzbek first.
+    ['en','ru'].forEach(previous=>{
+      const rev=reverse[previous]||{};
+      Object.keys(rev).sort((a,b)=>b.length-a.length).forEach(t=>{out=out.split(t).join(rev[t])});
+    });
+    if(lang==='uz')return out;
     const dict=maps[lang]||{};
     phrases.forEach(uz=>{if(dict[uz])out=out.split(uz).join(dict[uz])});
     return out;
