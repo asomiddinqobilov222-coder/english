@@ -539,7 +539,7 @@ function calendarBodyHTML(){
  for(let i=0;i<offset;i++)cells+='<span></span>';
  for(let n=1;n<=days;n++){const d=new Date(year,month,n),k=dateKey(d),p=S.progress[k],m=p?.modes||{},count=Object.keys(m).length,vals=Object.values(m).map(v=>Number(v.score)||0),pct=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/4):0,cls=count===4?'full':count?'partial':'',tod=k===today()?'today':'';cells+='<button type="button" class="cal-day '+cls+' '+tod+'" title="'+pct+'% progress" aria-label="'+k+': '+pct+'% progress" onclick="showCalendarDay(\''+k+'\')">'+n+'</button>'}
  const completeDays=Object.keys(S.progress||{}).filter(k=>k.startsWith(monthKey+'-')&&Object.keys(S.progress[k]?.modes||{}).length===4).length;
- return '<div class="row spread" style="align-items:center;gap:8px"><button class="btn ghost small" onclick="changeCalendarMonth(-1)" aria-label="Oldingi oy">‹</button><b>'+monthDate.toLocaleDateString('uz-UZ',{month:'long',year:'numeric'})+'</b><button class="btn ghost small" onclick="changeCalendarMonth(1)" aria-label="Keyingi oy">›</button></div><p class="subhead" style="margin-top:10px">Kunni tanlab natijani ko‘ring. 🟢 To‘liq · 🟡 Qisman</p><div class="calendar" style="margin-top:15px">'+['Du','Se','Ch','Pa','Ju','Sh','Ya'].map(x=>'<div class="cal-head">'+x+'</div>').join('')+cells+'</div><div class="row spread" style="margin-top:15px"><span class="badge">Zanjir: '+streak()+' kun</span><span class="badge">Bu oy: '+completeDays+' to‘liq kun</span></div>';
+ return '<div class="row spread" style="align-items:center;gap:8px"><button class="btn ghost small" onclick="changeCalendarMonth(-1)" aria-label="Oldingi oy">‹</button><b>'+monthDate.toLocaleDateString('uz-UZ',{month:'long',year:'numeric'})+'</b><button class="btn ghost small" onclick="changeCalendarMonth(1)" aria-label="Keyingi oy">›</button></div><p class="subhead" style="margin-top:10px">Kunni tanlab natijani ko‘ring. 🟢 To‘liq · 🟡 Qisman</p><div class="calendar" style="margin-top:15px">'+Array.from({length:7},(_,i)=>new Date(2024,0,1+i).toLocaleDateString(document.documentElement.lang==='ru'?'ru-RU':document.documentElement.lang==='en'?'en-US':'uz-UZ',{weekday:'short'})).map(x=>'<div class="cal-head">'+x+'</div>').join('')+cells+'</div><div class="row spread" style="margin-top:15px"><span class="badge">Zanjir: '+streak()+' kun</span><span class="badge">Bu oy: '+completeDays+' to‘liq kun</span></div>';
 }
 function changeCalendarMonth(delta){calendarMonthOffset=Math.max(-240,Math.min(240,calendarMonthOffset+delta));const wrap=$('#modal-root .calendar-month-content');if(!wrap){openCalendar();return}wrap.style.setProperty('--calendar-slide',delta<0?'-22px':'22px');wrap.classList.remove('is-sliding');wrap.innerHTML=calendarBodyHTML();void wrap.offsetWidth;wrap.classList.add('is-sliding')}
 function showCalendarDay(key){const p=S.progress[key],m=p?.modes||{},count=Object.keys(m).length,vals=Object.values(m).map(v=>Number(v.score)||0),pct=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/4):0,labels={flash:'Flashcard',match:'Moslashtirish',write:'Yozish',sentence:'Gap tuzish'},rows=Object.entries(m).map(([id,v])=>'<div class="list-item"><b>'+esc(labels[id]||id)+'</b><span class="badge">'+Math.round(Number(v.score)||0)+'%</span></div>').join(''),d=dayDate(key),dateLabel=d.toLocaleDateString('uz-UZ',{weekday:'long',day:'numeric',month:'long',year:'numeric'});modal(dateLabel,'<div class="calendar-detail"><div><span class="subhead">Kunlik progress</span><br><strong>'+pct+'%</strong></div><span class="badge">'+count+'/4 mashq</span></div><div style="margin-top:12px">'+(rows||'<p class="subhead">Bu kunda hali mashq natijasi yo‘q.</p>')+'</div>')}
@@ -1640,16 +1640,86 @@ body .app .translator-action-row .translator-icon-btn.mic.is-listening{backgroun
     "Gapni tarjima qilib yozish":["Translate and write the sentence","Перевести и записать предложение"],
     "So‘z va tarjimani topish":["Match the word and translation","Найдите слово и перевод"],
     "Inglizchasini yozish":["Write the English version","Напишите английский вариант"],
-    "So‘zni eslab qolish":["Remember the word","Запомнить слово"]
+    "So‘zni eslab qolish":["Remember the word","Запомнить слово"],
+    "Bugun:":["Today:","Сегодня:"],
+    "Bugun":["Today","Сегодня"],
+    "progress":["Progress","Прогресс"],
+    "So‘zlar:":["Words:","Слова:"],
+    "English ↔ O‘zbek":["English ↔ Uzbek","Английский ↔ узбекский"],
+    "Profil":["Profile","Профиль"],
+    "Sozlamalar va hisob":["Settings and account","Настройки и аккаунт"],
+    "Bugungi vazifalar:":["Today's tasks:","Задания на сегодня:"],
+    "vazifa bajarildi":["tasks completed","задания выполнено"],
+    "Kun yakunlandi":["Day completed","День завершён"],
+    "Davom etamiz":["Keep going","Продолжаем"],
+    "Boshlash":["Start","Начать"],
+    "Bajarildi:":["Completed:","Выполнено:"],
+    "Kutmoqda":["Pending","Ожидает"],
+    "So‘z qo‘shish":["Add a word","Добавить слово"],
+    "O‘SISH TARIXI":["LEARNING HISTORY","ИСТОРИЯ ПРОГРЕССА"],
+    "BUGUNGI REJA":["TODAY'S PLAN","ПЛАН НА СЕГОДНЯ"],
+    "So‘nggi 7 kun":["Last 7 days","Последние 7 дней"],
+    "Bir kun oldin":["One day earlier","На день раньше"],
+    "Bir kun keyin":["One day later","На день позже"],
+    "Nuqtani bosing yoki kursorni olib boring. Grafikni surishingiz ham mumkin.":["Click or hover over a point. You can also swipe the chart.","Нажмите на точку или наведите курсор. График также можно листать."],
+    "Bugungi so‘zlarni 4 xil usulda mashq qil.":["Practise today's words in four different ways.","Повторяйте сегодняшние слова четырьмя способами."],
+    "So‘z qo‘shilmagan bo‘lsa, avval profil yoki asosiy oynadan so‘z qo‘shing.":["If you have no words yet, add some from your profile or home screen first.","Если слов пока нет, сначала добавьте их в профиле или на главной странице."],
+    "Batafsil ko‘rish uchun nuqtani bosing.":["Click a point to see details.","Нажмите на точку, чтобы увидеть подробности."],
+    "Oldingi hafta":["Previous week","Предыдущая неделя"],
+    "Keyingi hafta":["Next week","Следующая неделя"],
+    "So‘z / ibora":["Word / phrase","Слово / выражение"],
+    "Asosiy tarjima":["Main translation","Основной перевод"],
+    "Shaxsiy tarjima qo‘shish (ixtiyoriy)":["Add a personal translation (optional)","Добавить личный перевод (необязательно)"],
+    "O‘zingizning izohingiz yoki misolingiz":["Your note or example","Ваш комментарий или пример"],
+    "Kunlik progress":["Daily progress","Прогресс за день"],
+    "to‘liq kun":["complete day","полный день"],
+    "Bu oy:":["This month:","В этом месяце:"],
+    "Zanjir:":["Streak:","Серия:"],
+    "Kunni tanlab natijani ko‘ring. 🟢 To‘liq · 🟡 Qisman":["Select a day to view its results. 🟢 Complete · 🟡 Partial","Выберите день, чтобы посмотреть результаты. 🟢 Полностью · 🟡 Частично"],
+    "Mashqlar kalendari":["Practice calendar","Календарь занятий"],
+    "Oldingi oy":["Previous month","Предыдущий месяц"],
+    "Keyingi oy":["Next month","Следующий месяц"],
+    "Bugun uchun so‘z yo‘q.":["No words for today.","На сегодня слов нет."],
+    "Tarjima shu yerda ko‘rinadi":["Your translation will appear here","Здесь появится перевод"],
+    "Tarjima qilinmoqda…":["Translating…","Перевод выполняется…"],
+    "Matn va misollar tozalandi.":["Text and examples cleared.","Текст и примеры очищены."],
+    "Matnni kiriting…":["Enter text…","Введите текст…"],
+    "So‘zlardan qidirish…":["Search words…","Поиск слов…"],
+    "Type the English word":["Type the English word","Введите английское слово"],
+    "O‘zingizning izohingiz yoki misolingiz":["Your note or example","Ваш комментарий или пример"]
   };
   const language=()=>{try{return localStorage.getItem('engliwords-ui-language')||'uz'}catch(_){return'uz'}};
+  // Make every date/time formatter follow the selected interface language,
+  // even where legacy code explicitly requested the old uz-UZ locale.
+  const localeFor=()=>language()==='ru'?'ru-RU':language()==='en'?'en-US':'uz-UZ';
+  ['toLocaleDateString','toLocaleTimeString','toLocaleString'].forEach(method=>{
+    const original=Date.prototype[method];
+    if(typeof original!=='function'||original.__engliwordsLocalized)return;
+    const localized=function(locales,options){
+      let requested=locales;
+      if(requested==null || (typeof requested==='string' && /^uz(?:-|$)/i.test(requested)) ||
+        (Array.isArray(requested) && requested.some(x=>typeof x==='string' && /^uz(?:-|$)/i.test(x)))){
+        requested=localeFor();
+      }
+      return original.call(this,requested,options);
+    };
+    localized.__engliwordsLocalized=true;
+    Date.prototype[method]=localized;
+  });
+  // The chart's manually assembled date range also uses the selected locale.
+  if(typeof rangeLabel==='function')rangeLabel=function(){
+    const last=new Date(),first=new Date();
+    last.setDate(last.getDate()+chartWindowOffset);first.setDate(last.getDate()-6);
+    const fmt=d=>d.toLocaleDateString(localeFor(),{day:'numeric',month:'short'});
+    return fmt(first)+' — '+fmt(last);
+  };
   const maps={en:{},ru:{}};
   Object.entries(UZ).forEach(([uz,vals])=>{maps.en[uz]=vals[0];maps.ru[uz]=vals[1]});
   const reverse={en:{},ru:{}};
   Object.entries(maps).forEach(([lang,dict])=>Object.entries(dict).forEach(([uz,v])=>{if(v&&v!==uz)reverse[lang][v]=uz}));
   const phrases=Object.keys(UZ).sort((a,b)=>b.length-a.length);
   const safeRoots=['#app','#nav','#modal-root','#toast'];
-  const ignored='.result-word,.result-word-name,.result-word-translation,.example,#dst,#src,.flash-word,.flashcard-word,.word-result-modal,.user-content,[data-user-content="true"],script,style,textarea,input,select,option,code';
+  const ignored='.result-word,.result-word-name,.result-word-translation,.example,#src,.flash-word,.flashcard-word,.word-result-modal,.user-content,[data-user-content="true"],script,style,textarea,input,select,option,code';
   function translateString(value,lang){
     if(!value)return value;
     let out=String(value);
