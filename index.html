@@ -1393,4 +1393,204 @@ body .app .translator-action-row .translator-icon-btn.translate{margin-left:0}
 body .app .translator-action-row .translator-icon-btn.mic.is-listening{background:linear-gradient(135deg,#ff9ba8,#ff617b);color:#3b0811;border-color:#ffc0c8}
 @media(max-width:420px){body .app .translator-action-row{gap:10px}body .app .translator-action-row .translator-icon-btn{flex-basis:44px;width:44px;height:44px}}
 </style>
+
+<script id="engliwords-i18n-complete">
+(function(){
+  'use strict';
+  const UZ={
+    "Har kuni bir qadam oldinga.":["One step forward every day.","Каждый день — на шаг вперёд."],
+    "Bugun o‘zingni rivojlantir":["Grow a little every day","Развивайся каждый день"],
+    "Kichik qadamlar — katta natijalar.":["Small steps lead to big results.","Маленькие шаги — большие результаты."],
+    "Bugungi vazifalar:":["Today's tasks:","Задания на сегодня:"],
+    "vazifa bajarildi":["tasks completed","задания выполнено"],
+    "Ajoyib!":["Excellent!","Отлично!"],
+    "Kun yakunlandi":["Day completed","День завершён"],
+    "Davom etamiz":["Keep going","Продолжаем"],
+    "Kunlik zanjir":["Daily streak","Серия дней"],
+    "So‘zlar ro‘yxati":["Word list","Список слов"],
+    "So‘z qo‘shish":["Add words","Добавить слова"],
+    "Bugungi so‘zlar":["Words due today","Слова на сегодня"],
+    "O‘SISH TARIXI":["LEARNING HISTORY","ИСТОРИЯ ПРОГРЕССА"],
+    "Mashq grafigi":["Practice chart","График занятий"],
+    "So‘nggi 7 kun":["Last 7 days","Последние 7 дней"],
+    "Bir kun oldin":["One day earlier","На день раньше"],
+    "Bir kun keyin":["One day later","На день позже"],
+    "Nuqtani bosing yoki kursorni olib boring. Grafikni surishingiz ham mumkin.":["Click or hover over a point. You can also swipe the chart.","Нажмите на точку или наведите курсор. График также можно листать."],
+    "BUGUNGI REJA":["TODAY'S PLAN","ПЛАН НА СЕГОДНЯ"],
+    "Davom ettirish":["Continue","Продолжить"],
+    "Bajarildi:":["Completed:","Выполнено:"],
+    "Kutmoqda":["Pending","Ожидает"],
+    "Boshlash":["Start","Начать"],
+    "Vazifalar":["Tasks","Задания"],
+    "Bugungi so‘zlarni 4 xil usulda mashq qil.":["Practice today's words in four different ways.","Повторяйте сегодняшние слова четырьмя способами."],
+    "So‘z qo‘shilmagan bo‘lsa, avval profil yoki asosiy oynadan so‘z qo‘shing.":["If you have no words yet, add some from your profile or home screen first.","Если слов пока нет, сначала добавьте их в профиле или на главной странице."],
+    "Mashq uchun so‘z topilmadi.":["No words found for practice.","Для упражнения слова не найдены."],
+    "Tayyor!":["Ready!","Готово!"],
+    "ESLAB QOLISH KARTASI":["FLASHCARD","КАРТОЧКА ДЛЯ ЗАПОМИНАНИЯ"],
+    "Tarjimani eslang":["Recall the translation","Вспомните перевод"],
+    "Bosib o‘giring":["Tap to flip","Нажмите, чтобы перевернуть"],
+    "O‘ZBEKCHA MA’NO":["UZBEK MEANING","ЗНАЧЕНИЕ НА УЗБЕКСКОМ"],
+    "Inglizcha so‘zni ko‘rish uchun bosing":["Tap to reveal the English word","Нажмите, чтобы увидеть английское слово"],
+    "Qaytarish uchun yana bosing":["Tap again to flip back","Нажмите ещё раз, чтобы перевернуть обратно"],
+    "Ovoz chiqarib aytib ko‘ring":["Try saying it aloud","Попробуйте произнести вслух"],
+    "Talaffuzni tinglash":["Listen to pronunciation","Послушать произношение"],
+    "Javobni bilarmidingiz? O‘zingizni baholang.":["Did you know the answer? Assess yourself.","Вы знали ответ? Оцените себя."],
+    "Avval javobni xotiradan topishga harakat qiling.":["Try to recall the answer first.","Сначала попробуйте вспомнить ответ."],
+    "Bilmadim":["Didn't know","Не знал(а)"],
+    "Bildim":["I knew it","Знал(а)"],
+    "MOSLASHTIRISH":["MATCHING","СОПОСТАВЛЕНИЕ"],
+    "Tarjima juftini toping":["Find the matching translation","Найдите соответствующий перевод"],
+    "ta tarjima qoldi":["translations left","переводов осталось"],
+    "xato qilingan inglizcha so‘z qayta tanlanmaydi.":["incorrectly matched English words cannot be selected again.","слова, сопоставленные неверно, больше нельзя выбрать."],
+    "Yangi so‘zlar":["New words","Новые слова"],
+    "O‘rganilmoqda":["Learning","Изучается"],
+    "Erkin ishlatiladi":["Ready to use","Готово к использованию"],
+    "Yangi so‘z":["New word","Новое слово"],
+    "Flashcard":["Flashcard","Карточки"],
+    "Moslashtirish":["Matching","Сопоставление"],
+    "Inglizchada yozish":["Write in English","Написание на английском"],
+    "Gaplarni tarjima qilish":["Translate sentences","Перевод предложений"],
+    "Real suhbatlar":["Real conversations","Реальные диалоги"],
+    "My Results":["My results","Мои результаты"],
+    "Show less":["Show less","Скрыть"],
+    "Show more":["Show more","Показать ещё"],
+    "So‘zlardan qidirish…":["Search words…","Поиск слов…"],
+    "Mos so‘z topilmadi.":["No matching words found.","Подходящие слова не найдены."],
+    "Tarjima mavjud emas":["No translation available","Перевод отсутствует"],
+    "natijalarini ko‘rish":["view results","посмотреть результаты"],
+    "Holati":["Status","Статус"],
+    "Umumiy o‘rtacha":["Overall average","Средний результат"],
+    "Shaxsiy profil":["Personal profile","Личный профиль"],
+    "O‘rganish jarayoningizni boshqaring.":["Manage your learning progress.","Управляйте процессом обучения."],
+    "Google profiliga ulaning":["Connect your Google account","Подключите аккаунт Google"],
+    "Ma’lumotlar qurilmada saqlanadi":["Data is stored on this device","Данные хранятся на этом устройстве"],
+    "Google Drive bilan sinxronlash faol":["Google Drive sync is active","Синхронизация с Google Drive активна"],
+    "Profil eslab qolingan. Sinxronlash uchun Google ruxsati kerak bo‘lishi mumkin.":["Profile remembered. Google permission may be required to sync.","Профиль сохранён. Для синхронизации может потребоваться разрешение Google."],
+    "Google akkaunt ulanmagan.":["No Google account connected.","Аккаунт Google не подключён."],
+    "Google Drive’ni ulash / yangilash":["Connect / refresh Google Drive","Подключить / обновить Google Drive"],
+    "Google orqali kirish":["Sign in with Google","Войти через Google"],
+    "Grok / Groq AI agenti":["Grok / Groq AI assistant","ИИ-помощник Grok / Groq"],
+    "AI agent ulangan va faol":["AI assistant connected and active","ИИ-помощник подключён и активен"],
+    "AI API kaliti tekshirildi. Gap tuzish uchun tayyor.":["AI API key verified. Ready for sentence practice.","Ключ API ИИ проверен. Готов к упражнениям с предложениями."],
+    "Kalitni almashtirish yoki uzish":["Change or disconnect key","Изменить или отключить ключ"],
+    "Gmail faqat Google/Drive kirishi uchun. Groq API kaliti (gsk_ bilan) sahifa yangilangandan keyin ham ushbu qurilmada va shu Google profiliga alohida saqlanadi. Umumiy yoki begona qurilmada kalitni saqlamang.":["Gmail is only used for Google/Drive sign-in. The Groq API key is stored separately on this device and for this Google profile. Do not save a key on a shared or public device.","Gmail используется только для входа через Google/Drive. Ключ API Groq хранится отдельно на этом устройстве и для этого профиля Google. Не сохраняйте ключ на общем или чужом устройстве."],
+    "Grok (xAI) yoki Groq API kaliti":["Grok (xAI) or Groq API key","Ключ API Grok (xAI) или Groq"],
+    "Ulash va tekshirish":["Connect and verify","Подключить и проверить"],
+    "Eslatma: kalit GitHub yoki Google Drive fayliga yozilmaydi, faqat ushbu brauzer xotirasida saqlanadi. Bu server darajasidagi maxfiy saqlash emas; qurilma umumiy bo‘lsa kalitni saqlamang.":["Note: the key is not written to GitHub or Google Drive; it is stored only in this browser. This is not server-side secret storage. Do not save it on a shared device.","Примечание: ключ не записывается в GitHub или Google Drive, а хранится только в этом браузере. Это не серверное защищённое хранилище. Не сохраняйте ключ на общем устройстве."],
+    "Sozlamalar":["Settings","Настройки"],
+    "Ovoz":["Sound","Звук"],
+    "Tugma bosilganda yumshoq signal":["Soft sound when a button is pressed","Мягкий сигнал при нажатии кнопки"],
+    "Vibratsiya":["Vibration","Вибрация"],
+    "Telefon qo‘llab-quvvatlasa":["If supported by the phone","Если поддерживается телефоном"],
+    "Zaxira nusxasi":["Backup","Резервная копия"],
+    "Lug‘atni JSON faylga saqlash":["Save dictionary as a JSON file","Сохранить словарь в файл JSON"],
+    "Eksport":["Export","Экспорт"],
+    "Ma’lumotni tiklash":["Restore data","Восстановить данные"],
+    "Avvalgi zaxira faylidan":["From a previous backup file","Из предыдущей резервной копии"],
+    "Import":["Import","Импорт"],
+    "Chiqish":["Sign out","Выйти"],
+    "Google profilini uzish":["Disconnect Google profile","Отключить профиль Google"],
+    "Tarjimon":["Translator","Переводчик"],
+    "Matnni tarjima qiling, talaffuzini tinglang va misol gaplarni ko‘ring.":["Translate text, listen to pronunciation, and view example sentences.","Переводите текст, слушайте произношение и смотрите примеры предложений."],
+    "Almashtirish":["Swap","Поменять местами"],
+    "Matn":["Text","Текст"],
+    "Matnni kiriting…":["Enter text…","Введите текст…"],
+    "Tarjima":["Translation","Перевод"],
+    "Tarjima shu yerda ko‘rinadi":["Your translation will appear here","Здесь появится перевод"],
+    "Ovoz orqali matn kiritish":["Enter text by voice","Ввести текст голосом"],
+    "Gapirib matn kiritish":["Speak to enter text","Продиктовать текст"],
+    "Matnni ovoz chiqarib o‘qish":["Read text aloud","Прочитать текст вслух"],
+    "O‘qish":["Read aloud","Читать вслух"],
+    "Matnni tozalash":["Clear text","Очистить текст"],
+    "Tozalash":["Clear","Очистить"],
+    "Tarjima qilish":["Translate","Перевести"],
+    "Inglizcha tarjimani o‘qish":["Read English translation aloud","Прочитать английский перевод"],
+    "Lug‘atga qo‘shish":["Add to dictionary","Добавить в словарь"],
+    "Ovozli o‘qish brauzer imkoniyatiga bog‘liq.":["Speech depends on browser support.","Озвучивание зависит от возможностей браузера."],
+    "Aksent:":["Accent:","Акцент:"],
+    "American English":["American English","Американский английский"],
+    "British English":["British English","Британский английский"],
+    "EXAMPLE SENTENCES":["EXAMPLE SENTENCES","ПРИМЕРЫ ПРЕДЛОЖЕНИЙ"],
+    "Misol gaplar":["Example sentences","Примеры предложений"],
+    "Misol gaplar hozircha yo‘q. Matn tarjima qilinganda, mavjud bo‘lsa, misollar shu yerda ko‘rinadi.":["No example sentences yet. Available examples will appear here after translation.","Пока нет примеров. Доступные примеры появятся здесь после перевода."],
+    "Matn va misollar tozalandi.":["Text and examples cleared.","Текст и примеры очищены."],
+    "Tarjima qilinmoqda…":["Translating…","Перевод выполняется…"],
+    "Tarjima olinmadi. Internetni tekshiring.":["Translation failed. Check your internet connection.","Не удалось перевести. Проверьте подключение к интернету."],
+    "Tarjima xizmati javob bermadi":["The translation service did not respond","Сервис перевода не ответил"],
+    "Avval matn kiriting.":["Enter text first.","Сначала введите текст."],
+    "Faqat bitta inglizcha so‘zni tarjima qiling.":["Translate a single English word only.","Переводите только одно английское слово."],
+    "bu so‘z lug‘atga allaqachon qo‘shilgan.":["This word is already in your dictionary.","Это слово уже добавлено в словарь."],
+    "Bu brauzer ovozli o‘qishni qo‘llamaydi.":["This browser does not support text-to-speech.","Этот браузер не поддерживает озвучивание текста."],
+    "O‘qish uchun matn yo‘q.":["There is no text to read.","Нет текста для озвучивания."],
+    "So‘z lug‘atda topilmadi:":["Word not found in dictionary:","Слово не найдено в словаре:"],
+    "Tuzatish":["Correct","Исправить"],
+    "Avval so‘z qo‘shing.":["Add a word first.","Сначала добавьте слово."],
+    "Bugun takrorlash muddati kelgan so‘z yo‘q.":["No words are due for review today.","Сегодня нет слов, срок повторения которых наступил."],
+    "Bugungi muddatli so‘zlar tugagan. Bugungi so‘zlarni qayta mashq qilasiz.":["You have finished today's due words. You can practise today's words again.","Слова, запланированные на сегодня, закончились. Вы можете повторить их ещё раз."],
+    "Avval davom etayotgan Taskni tugating.":["Finish the task already in progress first.","Сначала завершите уже начатое задание."],
+    "Bu bosqichda bugun mashq qilinadigan so‘z yo‘q.":["There are no words to practise in this stage today.","На этом этапе сегодня нет слов для тренировки."],
+    "Qoyil!!! vazifalar qolmadi.":["Great!!! No tasks left.","Отлично!!! Заданий больше нет."],
+    "Interfeys tili":["Interface language","Язык интерфейса"],
+    "Ilova tilini tanlang":["Choose app language","Выберите язык приложения"],
+    "Bu qurilmadagi interfeys tilini o‘zgartiradi.":["Changes the interface language on this device.","Изменяет язык интерфейса на этом устройстве."],
+    "O‘zbekcha":["Uzbek","Узбекский"],
+    "Yopish":["Close","Закрыть"],
+    "Tungi":["Night","Ночь"],
+    "Kunduzgi":["Day","День"],
+    "Tungi rejimga o‘tish":["Switch to night mode","Переключить на ночной режим"],
+    "Kunduzgi rejimga o‘tish":["Switch to day mode","Переключить на дневной режим"],
+    "Kunlik progress":["Daily progress","Прогресс за день"],
+    "Bu kunda hali mashq natijasi yo‘q.":["There are no practice results for this day yet.","За этот день пока нет результатов занятий."],
+    "Batafsil ko‘rish uchun nuqtani bosing.":["Click the point to see details.","Нажмите на точку, чтобы увидеть подробности."],
+    "Tarjima mavjud emas":["No translation available","Перевод отсутствует"]
+  };
+  const language=()=>{try{return localStorage.getItem('engliwords-ui-language')||'uz'}catch(_){return'uz'}};
+  const maps={en:{},ru:{}};
+  Object.entries(UZ).forEach(([uz,vals])=>{maps.en[uz]=vals[0];maps.ru[uz]=vals[1]});
+  const reverse={en:{},ru:{}};
+  Object.entries(maps).forEach(([lang,dict])=>Object.entries(dict).forEach(([uz,v])=>{if(v&&v!==uz)reverse[lang][v]=uz}));
+  const phrases=Object.keys(UZ).sort((a,b)=>b.length-a.length);
+  const safeRoots=['#app','#nav','#modal-root','#toast'];
+  const ignored='.result-word,.result-word-name,.result-word-translation,.example,#dst,#src,.flash-word,.flashcard-word,.word-result-modal,.user-content,[data-user-content="true"],script,style,textarea,input,select,option,code';
+  function translateString(value,lang){
+    if(!value||lang==='uz')return value;
+    let out=String(value);
+    const rev=reverse[lang]||{};
+    Object.keys(rev).sort((a,b)=>b.length-a.length).forEach(t=>{out=out.split(t).join(rev[t])});
+    const dict=maps[lang]||{};
+    phrases.forEach(uz=>{if(dict[uz])out=out.split(uz).join(dict[uz])});
+    return out;
+  }
+  function apply(){
+    const lang=language();
+    document.documentElement.lang=lang;
+    safeRoots.forEach(sel=>{
+      const root=document.querySelector(sel);if(!root)return;
+      const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+      const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+      nodes.forEach(node=>{
+        const p=node.parentElement;
+        if(!p||p.closest(ignored))return;
+        const next=translateString(node.nodeValue,lang);
+        if(next!==node.nodeValue)node.nodeValue=next;
+      });
+      root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>{
+        ['placeholder','title','aria-label'].forEach(attr=>{
+          const v=el.getAttribute(attr);if(v){const n=translateString(v,lang);if(n!==v)el.setAttribute(attr,n)}
+        });
+      });
+    });
+    const sel=document.querySelector('#ui-language');
+    if(sel&&sel.value!==lang)sel.value=lang;
+  }
+  let queued=false;
+  function schedule(){if(queued)return;queued=true;queueMicrotask(()=>{queued=false;apply()})}
+  document.addEventListener('change',e=>{if(e.target?.id==='ui-language')schedule()},true);
+  const observer=new MutationObserver(schedule);
+  observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['placeholder','title','aria-label']});
+  window.engliwordsApplyLanguage=apply;
+  window.engliwordsTranslate=translateString;
+  apply();
+})();
+</script>
 </body></html>
