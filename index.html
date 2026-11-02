@@ -1417,8 +1417,6 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
  document.documentElement.lang=get();
  roots.forEach(root=>apply(root));
  roots.forEach(root=>observer.observe(root,{childList:true,subtree:true,characterData:true}));
- document.documentElement.lang=get();
- roots.forEach(root=>apply(root));
 })();
 </script>
 <style id="translator-action-row-fix">
