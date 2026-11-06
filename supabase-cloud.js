@@ -65,13 +65,16 @@ async function sbLoadOrMigrate(user) {
 }
 
 async function sbHandleSession(session) {
-  const user = session && session.user;
+  let user = session && session.user;
   if (!user) {
+    sbHandlingUser = null;
     sbUserId = null;
+    sbBusy = false;
     S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
     window.__sbProfile = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; cloud.token = null; }
     sbRender();
+    sbRenderAuthGate("signup");
     return;
   }
   if (sbHandlingUser === user.id && sbUserId === user.id) return;
@@ -80,16 +83,27 @@ async function sbHandleSession(session) {
   sbBusy = true;
   sbLastError = "";
   sbUserId = user.id;
-  window.__sbProfile = {name:user.user_metadata?.nickname || "", picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
-  if (typeof cloud === "object") { cloud.user = {sub:user.id,name:window.__sbProfile.name,picture:window.__sbProfile.picture}; cloud.ready = true; }
-  sbRender();
+  sbRenderAuthGate("loading");
   try {
     await sbLoadOrMigrate(user);
+    let nickname = String(user.user_metadata?.nickname || "").trim();
+    if (!nickname) {
+      sbRenderAuthGate("nickname");
+      user = await new Promise(resolve => { sbNicknameResolver = resolve; });
+      nickname = String(user.user_metadata?.nickname || "").trim();
+    }
+    window.__sbProfile = {name:nickname, picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
+    if (typeof cloud === "object") {
+      cloud.user = {sub:user.id, name:nickname, picture:window.__sbProfile.picture};
+      cloud.ready = true;
+      cloud.token = null;
+    }
     sbLastError = "";
+    sbRenderAuthGate("hidden");
   } catch (e) {
-    console.error("Supabase load failed:", e);
-    sbLastError = e?.message || "Ma'lumotlarni yuklab bo'lmadi";
-
+    console.error("Supabase profile setup failed:", e);
+    sbLastError = e?.message || "Profil ma’lumotlarini yuklab bo‘lmadi";
+    sbRenderAuthGate("signup", sbLastError);
   } finally {
     sbBusy = false;
     sbHandlingUser = null;
@@ -100,6 +114,7 @@ async function sbHandleSession(session) {
 
 async function cloudLogin() {
   try {
+    sbRenderAuthGate("loading");
     const {error} = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {redirectTo: "https://asomiddinqobilov222-coder.github.io/english/"}
@@ -107,7 +122,7 @@ async function cloudLogin() {
     if (error) throw error;
   } catch (e) {
     console.error(e);
-    alert("Gmail orqali ro‘yxatdan o‘tishda xatolik: " + (e?.message || "Noma'lum xato"));
+    sbRenderAuthGate("signup", "Ro‘yxatdan o‘tishda xatolik: " + (e?.message || "Noma’lum xato"));
   }
 }
 
@@ -161,6 +176,8 @@ async function cloudLogout() {
   }
 }
 
+try { localStorage.removeItem("eng-cloud-profile"); localStorage.removeItem("eng-cloud-linked"); } catch {}
+
 // Remove legacy local copies of vocabulary/progress so they cannot leak across profiles.
 try {
   for (const key of Object.keys(localStorage)) {
@@ -188,7 +205,66 @@ async function sbRestoreSession(source) {
   }
 }
 
+
+let sbNicknameResolver = null;
+function sbGateEscape(v) {
+  return String(v || "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+function sbRenderAuthGate(mode, errorText="") {
+  if (!document.body) return;
+  let root = document.getElementById("sb-auth-gate");
+  if (mode === "hidden") { if (root) root.remove(); return; }
+  if (!root) { root = document.createElement("div"); root.id = "sb-auth-gate"; document.body.appendChild(root); }
+  if (!document.getElementById("sb-auth-gate-css")) {
+    const style = document.createElement("style");
+    style.id = "sb-auth-gate-css";
+    style.textContent = "#sb-auth-gate{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px;background:linear-gradient(155deg,#071326f7,#102b43f7);backdrop-filter:blur(18px);color:#f3f7ff;font-family:inherit}#sb-auth-gate .gate-card{width:min(430px,100%);padding:26px 22px;border:1px solid #ffffff24;border-radius:24px;background:linear-gradient(145deg,#172b47,#101e34);box-shadow:0 24px 70px #0007;text-align:center}#sb-auth-gate h2{margin:0 0 10px;font-size:23px}#sb-auth-gate p{color:#b5c6dc;font-size:14px;line-height:1.5}#sb-auth-gate input{width:100%;padding:14px;border-radius:13px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box}#sb-auth-gate button{width:100%;margin-top:14px;padding:14px;border:0;border-radius:14px;background:linear-gradient(120deg,#75e5d2,#a0f0dc);color:#071b20;font:inherit;font-weight:800;cursor:pointer}#sb-auth-gate .gate-note{font-size:11px;color:#9fb2ca}#sb-auth-gate .gate-error{color:#ff9aa5;font-size:12px}";
+    document.head.appendChild(style);
+  }
+  if (mode === "loading") {
+    root.innerHTML = '<div class="gate-card"><h2>Engliwords</h2><p>Profilingiz tekshirilmoqda…</p><div class="loading"></div></div>';
+  } else if (mode === "nickname") {
+    root.innerHTML = '<form class="gate-card" onsubmit="event.preventDefault();sbSaveNickname()"><h2>Profilingizni yarating</h2><p>Sizga qanday murojaat qilishimiz uchun nickname tanlang.</p><label for="sb-nickname">Nickname</label><input id="sb-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Masalan, Asomiddin" required><p class="gate-error" id="sb-nickname-error">' + sbGateEscape(errorText) + '</p><button id="sb-nickname-submit" type="submit">Profilni yaratish</button><p class="gate-note">Keyingi kirishlarda ham shu nickname ishlatiladi.</p></form>';
+    setTimeout(() => document.getElementById("sb-nickname")?.focus(), 0);
+  } else {
+    root.innerHTML = '<div class="gate-card"><h2>Engliwords’ga xush kelibsiz</h2><p>Davom etish uchun Gmail bilan shaxsiy profil yarating.</p><button type="button" onclick="cloudLogin()">Gmail bilan ro‘yxatdan o‘tish</button><p class="gate-note">Gmail manzilingiz Engliwords ichida ko‘rsatilmaydi.</p>' + (errorText ? '<p class="gate-error">' + sbGateEscape(errorText) + '</p>' : '') + '</div>';
+  }
+}
+async function sbSaveNickname() {
+  if (!sbNicknameResolver) return;
+  const input = document.getElementById("sb-nickname");
+  const nickname = String(input?.value || "").trim();
+  const error = document.getElementById("sb-nickname-error");
+  if (nickname.length < 2 || nickname.length > 24) {
+    if (error) error.textContent = "Nickname 2–24 ta belgidan iborat bo‘lishi kerak.";
+    input?.focus();
+    return;
+  }
+  const button = document.getElementById("sb-nickname-submit");
+  if (button) { button.disabled = true; button.textContent = "Saqlanmoqda…"; }
+  try {
+    const {data, error: updateError} = await supabaseClient.auth.updateUser({data:{nickname}});
+    if (updateError) throw updateError;
+    let updatedUser = data?.user;
+    if (!updatedUser) {
+      const {data: current, error: getError} = await supabaseClient.auth.getUser();
+      if (getError) throw getError;
+      updatedUser = current?.user;
+    }
+    if (!updatedUser) throw new Error("Profil ma’lumotlari olinmadi.");
+    const resolve = sbNicknameResolver;
+    sbNicknameResolver = null;
+    resolve(updatedUser);
+  } catch (e) {
+    console.error("Nickname save failed:", e);
+    if (error) error.textContent = e?.message || "Nickname saqlanmadi. Qayta urinib ko‘ring.";
+    if (button) { button.disabled = false; button.textContent = "Profilni yaratish"; }
+  }
+}
+window.sbSaveNickname = sbSaveNickname;
+
 window.addEventListener("DOMContentLoaded", async () => {
+  sbRenderAuthGate("loading");
   try {
     supabaseClient.auth.onAuthStateChange((event, session) => {
       if (event === "INITIAL_SESSION" && !session) {
