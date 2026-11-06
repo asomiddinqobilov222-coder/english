@@ -161,7 +161,6 @@ async function sbSubmitAuth(mode) {
   }
 }
 window.sbSubmitAuth = sbSubmitAuth;
-}
 
 async function cloudUpload() {
   if (!sbUserId || sbBusy) return;
@@ -215,12 +214,8 @@ async function cloudLogout() {
 
 try { localStorage.removeItem("eng-cloud-profile"); localStorage.removeItem("eng-cloud-linked"); } catch {}
 
-// Remove legacy local copies of vocabulary/progress so they cannot leak across profiles.
-try {
-  for (const key of Object.keys(localStorage)) {
-    if (key === "eng" || key.startsWith("eng-data:")) localStorage.removeItem(key);
-  }
-} catch (e) { console.warn("Legacy local data cleanup failed:", e); }
+// Preserve guest-mode data locally; remove only the obsolete pre-account key.
+try { localStorage.removeItem("eng"); } catch {}
 
 // Re-read persisted auth state when the PWA becomes visible. Some Android
 // standalone launches can deliver an early empty INITIAL_SESSION event while
