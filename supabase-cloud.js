@@ -65,32 +65,33 @@ async function sbLoadOrMigrate(user) {
 }
 
 async function sbHandleSession(session) {
-  let user = session && session.user;
+  const user = session && session.user;
   if (!user) {
     sbHandlingUser = null;
     sbUserId = null;
     sbBusy = false;
-    S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
     window.__sbProfile = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; cloud.token = null; }
+    try {
+      const guest = JSON.parse(localStorage.getItem("eng-data:local") || "null");
+      S = guest && typeof guest === "object" ? sbNormalizeState(guest) : sbNormalizeState(defaults());
+    } catch { S = sbNormalizeState(defaults()); }
     sbRender();
-    sbRenderAuthGate("signup");
+    sbEnsureAuthEntry();
+    if (typeof render === "function") render();
     return;
   }
   if (sbHandlingUser === user.id && sbUserId === user.id) return;
-  if (sbUserId !== user.id) S = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{},history:{}};
+  if (sbUserId !== user.id) S = sbNormalizeState(defaults());
   sbHandlingUser = user.id;
   sbBusy = true;
   sbLastError = "";
   sbUserId = user.id;
-  sbRenderAuthGate("loading");
   try {
     await sbLoadOrMigrate(user);
     let nickname = String(user.user_metadata?.nickname || "").trim();
     if (!nickname) {
-      sbRenderAuthGate("nickname");
-      user = await new Promise(resolve => { sbNicknameResolver = resolve; });
-      nickname = String(user.user_metadata?.nickname || "").trim();
+      nickname = "Engliwords foydalanuvchisi";
     }
     window.__sbProfile = {name:nickname, picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
     if (typeof cloud === "object") {
@@ -99,11 +100,16 @@ async function sbHandleSession(session) {
       cloud.token = null;
     }
     sbLastError = "";
-    sbRenderAuthGate("hidden");
   } catch (e) {
     console.error("Supabase profile setup failed:", e);
     sbLastError = e?.message || "Profil ma’lumotlarini yuklab bo‘lmadi";
-    sbRenderAuthGate("signup", sbLastError);
+    sbUserId = null;
+    if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; }
+    try {
+      const guest = JSON.parse(localStorage.getItem("eng-data:local") || "null");
+      S = guest && typeof guest === "object" ? sbNormalizeState(guest) : sbNormalizeState(defaults());
+    } catch { S = sbNormalizeState(defaults()); }
+    if (typeof toast === "function") toast("Profil yuklanmadi. Mehmon rejimida davom etishingiz mumkin.");
   } finally {
     sbBusy = false;
     sbHandlingUser = null;
@@ -111,19 +117,50 @@ async function sbHandleSession(session) {
     if (typeof render === "function") render();
   }
 }
+}
 
-async function cloudLogin() {
+function cloudLogin(mode) {
+  sbRenderAuthGate(mode || "choice");
+}
+async function sbSubmitAuth(mode) {
+  const email = String(document.getElementById("sb-auth-email")?.value || "").trim();
+  const password = String(document.getElementById("sb-auth-password")?.value || "");
+  const nickname = String(document.getElementById("sb-auth-nickname")?.value || "").trim();
+  const errorBox = document.getElementById("sb-auth-error");
+  const submit = document.getElementById("sb-auth-submit");
+  const showError = message => { if (errorBox) errorBox.textContent = message; };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError("To‘g‘ri email manzil kiriting.");
+  if (password.length < 6) return showError("Parol kamida 6 ta belgidan iborat bo‘lishi kerak.");
+  if (mode === "signup" && (nickname.length < 2 || nickname.length > 24)) return showError("Nickname 2–24 ta belgidan iborat bo‘lishi kerak.");
+  if (submit) { submit.disabled = true; submit.textContent = mode === "signup" ? "Profil yaratilmoqda…" : "Kirilmoqda…"; }
   try {
-    sbRenderAuthGate("loading");
-    const {error} = await supabaseClient.auth.signInWithOAuth({
-      provider: "google",
-      options: {redirectTo: "https://asomiddinqobilov222-coder.github.io/english/"}
-    });
-    if (error) throw error;
+    if (mode === "signup") {
+      const {data,error} = await supabaseClient.auth.signUp({
+        email, password,
+        options: {data:{nickname}, emailRedirectTo:"https://engliwords.uz/"}
+      });
+      if (error) throw error;
+      if (data.session) {
+        sbCloseAuthGate();
+        await sbHandleSession(data.session);
+        if (typeof toast === "function") toast("Profil yaratildi. Xush kelibsiz, " + nickname + "!");
+      } else {
+        sbRenderAuthGate("message", "Tasdiqlash xabari emailingizga yuborildi. Emailni tasdiqlagach, Sign in orqali kiring.");
+      }
+    } else {
+      const {data,error} = await supabaseClient.auth.signInWithPassword({email,password});
+      if (error) throw error;
+      sbCloseAuthGate();
+      await sbHandleSession(data.session);
+      if (typeof toast === "function") toast("Profilga muvaffaqiyatli kirdingiz.");
+    }
   } catch (e) {
-    console.error(e);
-    sbRenderAuthGate("signup", "Ro‘yxatdan o‘tishda xatolik: " + (e?.message || "Noma’lum xato"));
+    console.error("Email/password authentication failed:",e);
+    showError(e?.message || "Kirishda xatolik yuz berdi.");
+    if (submit) { submit.disabled = false; submit.textContent = mode === "signup" ? "Sign up" : "Sign in"; }
   }
+}
+window.sbSubmitAuth = sbSubmitAuth;
 }
 
 async function cloudUpload() {
@@ -199,73 +236,65 @@ async function sbRestoreSession(source) {
   } catch (e) {
     console.error("Supabase session restore failed (" + source + "):", e);
     sbLastError = e?.message || "Sessiyani tiklab bo'lmadi";
-    sbRenderAuthGate("signup", sbLastError);
     sbRender();
+    sbEnsureAuthEntry();
   } finally {
     sbSessionCheckInProgress = false;
   }
 }
 
 
-let sbNicknameResolver = null;
 function sbGateEscape(v) {
   return String(v || "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
-function sbRenderAuthGate(mode, errorText="") {
-  if (!document.body) return;
-  let root = document.getElementById("sb-auth-gate");
-  if (mode === "hidden") { if (root) root.remove(); return; }
-  if (!root) { root = document.createElement("div"); root.id = "sb-auth-gate"; document.body.appendChild(root); }
-  if (!document.getElementById("sb-auth-gate-css")) {
-    const style = document.createElement("style");
-    style.id = "sb-auth-gate-css";
-    style.textContent = "#sb-auth-gate{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px;background:linear-gradient(155deg,#071326f7,#102b43f7);backdrop-filter:blur(18px);color:#f3f7ff;font-family:inherit}#sb-auth-gate .gate-card{width:min(430px,100%);padding:26px 22px;border:1px solid #ffffff24;border-radius:24px;background:linear-gradient(145deg,#172b47,#101e34);box-shadow:0 24px 70px #0007;text-align:center}#sb-auth-gate h2{margin:0 0 10px;font-size:23px}#sb-auth-gate p{color:#b5c6dc;font-size:14px;line-height:1.5}#sb-auth-gate input{width:100%;padding:14px;border-radius:13px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box}#sb-auth-gate button{width:100%;margin-top:14px;padding:14px;border:0;border-radius:14px;background:linear-gradient(120deg,#75e5d2,#a0f0dc);color:#071b20;font:inherit;font-weight:800;cursor:pointer}#sb-auth-gate .gate-note{font-size:11px;color:#9fb2ca}#sb-auth-gate .gate-error{color:#ff9aa5;font-size:12px}";
+function sbCloseAuthGate() {
+  const root=document.getElementById("sb-auth-gate");
+  if(root) root.remove();
+}
+function sbRenderAuthGate(mode="choice", message="") {
+  let root=document.getElementById("sb-auth-gate");
+  if(!root){root=document.createElement("div");root.id="sb-auth-gate";document.body.appendChild(root);}
+  if(!document.getElementById("sb-auth-gate-css")){
+    const style=document.createElement("style");style.id="sb-auth-gate-css";
+    style.textContent="#sb-auth-gate{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:18px;background:#030b18b8;backdrop-filter:blur(12px);color:var(--text);font-family:inherit}#sb-auth-gate .gate-card{position:relative;width:min(430px,100%);max-height:90dvh;overflow:auto;padding:25px 21px;border:1px solid #ffffff24;border-radius:24px;background:linear-gradient(145deg,#172b47,#101e34);box-shadow:0 24px 70px #0007}#sb-auth-gate h2{margin:0 34px 8px 0;font-size:23px}#sb-auth-gate p{color:#b5c6dc;font-size:13px;line-height:1.5}#sb-auth-gate label{display:block;margin:13px 0 6px;font-size:12px;color:#c7d6e8;font-weight:700}#sb-auth-gate input{width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box}#sb-auth-gate button{padding:13px;border:0;border-radius:13px;background:linear-gradient(120deg,#75e5d2,#a0f0dc);color:#071b20;font:inherit;font-weight:800;cursor:pointer}#sb-auth-gate button:disabled{opacity:.6}#sb-auth-gate .gate-primary{width:100%;margin-top:16px}#sb-auth-gate .gate-secondary{width:100%;margin-top:9px;background:#243b57;color:#edf4ff;border:1px solid #ffffff20}#sb-auth-gate .gate-close{position:absolute;right:15px;top:14px;width:34px;height:34px;padding:0;background:#ffffff12;color:#fff;border:1px solid #ffffff20;border-radius:50%;font-size:20px}#sb-auth-gate .gate-error{color:#ff9aa5;font-size:12px;overflow-wrap:anywhere}#sb-auth-gate .gate-note{font-size:11px;color:#9fb2ca}";
     document.head.appendChild(style);
   }
-  if (mode === "loading") {
-    root.innerHTML = '<div class="gate-card"><h2>Engliwords</h2><p>Profilingiz tekshirilmoqda…</p><div class="loading"></div></div>';
-  } else if (mode === "nickname") {
-    root.innerHTML = '<form class="gate-card" onsubmit="event.preventDefault();sbSaveNickname()"><h2>Profilingizni yarating</h2><p>Sizga qanday murojaat qilishimiz uchun nickname tanlang.</p><label for="sb-nickname">Nickname</label><input id="sb-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Masalan, Asomiddin" required><p class="gate-error" id="sb-nickname-error">' + sbGateEscape(errorText) + '</p><button id="sb-nickname-submit" type="submit">Profilni yaratish</button><p class="gate-note">Keyingi kirishlarda ham shu nickname ishlatiladi.</p></form>';
-    setTimeout(() => document.getElementById("sb-nickname")?.focus(), 0);
+  const close='<button class="gate-close" type="button" onclick="sbCloseAuthGate()" aria-label="Close">×</button>';
+  if(mode==="signin"||mode==="signup"){
+    const isUp=mode==="signup";
+    root.innerHTML='<form class="gate-card" onsubmit="event.preventDefault();sbSubmitAuth(\''+mode+'\')">'+close+'<h2>'+(isUp?"Create account":"Sign in")+'</h2><p>'+(isUp?"Create your personal Engliwords profile.":"Sign in to your existing Engliwords profile.")+'</p>'+
+      (isUp?'<label for="sb-auth-nickname">Nickname</label><input id="sb-auth-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Your nickname" required>':'')+
+      '<label for="sb-auth-email">Gmail / Email</label><input id="sb-auth-email" type="email" autocomplete="email" placeholder="name@gmail.com" required><label for="sb-auth-password">Password</label><input id="sb-auth-password" type="password" minlength="6" autocomplete="'+(isUp?"new-password":"current-password")+'" placeholder="At least 6 characters" required><p class="gate-error" id="sb-auth-error">'+sbGateEscape(message)+'</p><button id="sb-auth-submit" class="gate-primary" type="submit">'+(isUp?"Sign up":"Sign in")+'</button><button class="gate-secondary" type="button" onclick="sbRenderAuthGate(\''+(isUp?"signin":"signup")+'\')">'+(isUp?"Already have an account? Sign in":"New here? Sign up")+'</button></form>';
+    setTimeout(()=>document.getElementById("sb-auth-email")?.focus(),0);
+  } else if(mode==="message"){
+    root.innerHTML='<div class="gate-card">'+close+'<h2>Check your email</h2><p>'+sbGateEscape(message)+'</p><button class="gate-primary" onclick="sbRenderAuthGate(\'signin\')">Go to Sign in</button></div>';
   } else {
-    root.innerHTML = '<div class="gate-card"><h2>Engliwords’ga xush kelibsiz</h2><p>Davom etish uchun Gmail bilan shaxsiy profil yarating.</p><button type="button" onclick="cloudLogin()">Gmail bilan ro‘yxatdan o‘tish</button><p class="gate-note">Gmail manzilingiz Engliwords ichida ko‘rsatilmaydi.</p>' + (errorText ? '<p class="gate-error">' + sbGateEscape(errorText) + '</p>' : '') + '</div>';
+    root.innerHTML='<div class="gate-card">'+close+'<h2>Engliwords account</h2><p>Choose how you want to continue.</p><button class="gate-primary" onclick="sbRenderAuthGate(\'signin\')">Sign in</button><button class="gate-secondary" onclick="sbRenderAuthGate(\'signup\')">Sign up</button></div>';
   }
 }
-async function sbSaveNickname() {
-  if (!sbNicknameResolver) return;
-  const input = document.getElementById("sb-nickname");
-  const nickname = String(input?.value || "").trim();
-  const error = document.getElementById("sb-nickname-error");
-  if (nickname.length < 2 || nickname.length > 24) {
-    if (error) error.textContent = "Nickname 2–24 ta belgidan iborat bo‘lishi kerak.";
-    input?.focus();
-    return;
-  }
-  const button = document.getElementById("sb-nickname-submit");
-  if (button) { button.disabled = true; button.textContent = "Saqlanmoqda…"; }
-  try {
-    const {data, error: updateError} = await supabaseClient.auth.updateUser({data:{nickname}});
-    if (updateError) throw updateError;
-    let updatedUser = data?.user;
-    if (!updatedUser) {
-      const {data: current, error: getError} = await supabaseClient.auth.getUser();
-      if (getError) throw getError;
-      updatedUser = current?.user;
-    }
-    if (!updatedUser) throw new Error("Profil ma’lumotlari olinmadi.");
-    const resolve = sbNicknameResolver;
-    sbNicknameResolver = null;
-    resolve(updatedUser);
-  } catch (e) {
-    console.error("Nickname save failed:", e);
-    if (error) error.textContent = e?.message || "Nickname saqlanmadi. Qayta urinib ko‘ring.";
-    if (button) { button.disabled = false; button.textContent = "Profilni yaratish"; }
-  }
+function sbEnsureAuthEntry(){
+  const top=document.querySelector(".top2 .topr")||document.querySelector(".top");
+  if(!top)return;
+  let button=document.getElementById("sb-auth-entry");
+  if(!button){button=document.createElement("button");button.id="sb-auth-entry";button.type="button";button.className="btn small";button.style.cssText="margin-left:8px;white-space:nowrap;flex:none";top.appendChild(button);}
+  const signed=Boolean(sbUserId);
+  button.textContent=signed?("👤 "+((window.__sbProfile&&window.__sbProfile.name)||"Profile")):"Sign in";
+  button.classList.toggle("primary",!signed);
+  button.classList.toggle("secondary",signed);
+  button.onclick=()=>signed?(typeof page!=="undefined"?(page="profile",render()):sbRenderAuthGate("choice")):sbRenderAuthGate("choice");
 }
-window.sbSaveNickname = sbSaveNickname;
+function cloudSaveDebounced(){
+  clearTimeout(sbSaveTimer);
+  sbSaveTimer=setTimeout(async()=>{
+    if(sbUserId){await cloudUpload();return;}
+    try{localStorage.setItem("eng-data:local",JSON.stringify(sbNormalizeState(S)));}catch(e){console.warn("Guest save failed:",e);}
+  },700);
+}
+window.sbCloseAuthGate=sbCloseAuthGate;
+window.sbRenderAuthGate=sbRenderAuthGate;
+window.cloudLogin=cloudLogin;
 
 window.addEventListener("DOMContentLoaded", async () => {
-  sbRenderAuthGate("loading");
   try {
     supabaseClient.auth.onAuthStateChange((event, session) => {
       if (event === "INITIAL_SESSION" && !session) {
@@ -283,6 +312,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     console.error("Supabase initialization failed:", e);
     sbLastError = e?.message || "Boshlashda xatolik";
     sbRender();
+    sbEnsureAuthEntry();
   }
 });
 
