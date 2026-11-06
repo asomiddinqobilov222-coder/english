@@ -36,7 +36,7 @@ function sbRender() {
   const actions = document.getElementById("cloud-actions");
   if (!status || !actions) return;
   if (!sbUserId) {
-    status.textContent = "Hozircha qurilmada saqlanmoqda. Google orqali kirib, bulutli saqlashni yoqing.";
+    status.textContent = "Gmail bilan ro‘yxatdan o‘tib, shaxsiy profilingizni yarating." ;
     actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">🔐 Gmail bilan ro‘yxatdan o‘tish</button>';
     return;
   }
@@ -199,6 +199,7 @@ async function sbRestoreSession(source) {
   } catch (e) {
     console.error("Supabase session restore failed (" + source + "):", e);
     sbLastError = e?.message || "Sessiyani tiklab bo'lmadi";
+    sbRenderAuthGate("signup", sbLastError);
     sbRender();
   } finally {
     sbSessionCheckInProgress = false;
