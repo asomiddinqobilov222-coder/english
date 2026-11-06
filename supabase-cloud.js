@@ -292,6 +292,15 @@ window.sbCloseAuthGate=sbCloseAuthGate;
 window.sbRenderAuthGate=sbRenderAuthGate;
 window.cloudLogin=cloudLogin;
 
+// Keep the optional account action visible after every app navigation/render.
+const sbBaseRender = typeof render === "function" ? render : null;
+if (sbBaseRender) {
+  render = function() {
+    sbBaseRender();
+    sbEnsureAuthEntry();
+  };
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   try {
     supabaseClient.auth.onAuthStateChange((event, session) => {
