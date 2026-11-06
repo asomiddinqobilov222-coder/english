@@ -37,11 +37,11 @@ function sbRender() {
   if (!status || !actions) return;
   if (!sbUserId) {
     status.textContent = "Hozircha qurilmada saqlanmoqda. Google orqali kirib, bulutli saqlashni yoqing.";
-    actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">🔐 Google orqali kirish va saqlash</button>';
+    actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">🔐 Gmail bilan ro‘yxatdan o‘tish</button>';
     return;
   }
   status.textContent = sbBusy ? "☁️ Supabase bilan sinxronlanmoqda..." : (sbLastError ? "⚠️ Sinxronlash xatosi: " + sbLastError : "☁️ Supabase bilan sinxronlangan");
-  const name = (window.__sbProfile && (window.__sbProfile.name || window.__sbProfile.email)) || "Google foydalanuvchisi";
+  const name = (window.__sbProfile && window.__sbProfile.name) || "Engliwords foydalanuvchisi";
   actions.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-size:13px;flex:1;min-width:90px">' + String(name).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) + '</div><button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Hozir saqlash</button><button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button></div>';
 }
 
@@ -80,8 +80,8 @@ async function sbHandleSession(session) {
   sbBusy = true;
   sbLastError = "";
   sbUserId = user.id;
-  window.__sbProfile = {email:user.email || "", name:user.user_metadata?.full_name || user.user_metadata?.name || user.email || "", picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
-  if (typeof cloud === "object") { cloud.user = {sub:user.id,email:user.email || "",name:window.__sbProfile.name,picture:window.__sbProfile.picture}; cloud.ready = true; }
+  window.__sbProfile = {name:user.user_metadata?.nickname || "", picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
+  if (typeof cloud === "object") { cloud.user = {sub:user.id,name:window.__sbProfile.name,picture:window.__sbProfile.picture}; cloud.ready = true; }
   sbRender();
   try {
     await sbLoadOrMigrate(user);
@@ -107,7 +107,7 @@ async function cloudLogin() {
     if (error) throw error;
   } catch (e) {
     console.error(e);
-    alert("Supabase Google login xatosi: " + (e?.message || "Noma'lum xato"));
+    alert("Gmail orqali ro‘yxatdan o‘tishda xatolik: " + (e?.message || "Noma'lum xato"));
   }
 }
 
