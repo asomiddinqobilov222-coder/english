@@ -137,7 +137,7 @@ async function sbSubmitAuth(mode) {
     if (mode === "signup") {
       const {data,error} = await supabaseClient.auth.signUp({
         email, password,
-        options: {data:{nickname}, emailRedirectTo:"https://engliwords.uz/"}
+        options: {data:{nickname}}
       });
       if (error) throw error;
       if (data.session) {
