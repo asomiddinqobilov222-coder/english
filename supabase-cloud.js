@@ -36,13 +36,14 @@ function sbRender() {
   const actions = document.getElementById("cloud-actions");
   if (!status || !actions) return;
   if (!sbUserId) {
-    status.textContent = "Gmail bilan ro‘yxatdan o‘tib, shaxsiy profilingizni yarating." ;
-    actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">🔐 Gmail bilan ro‘yxatdan o‘tish</button>';
+    status.textContent = "Mehmon rejimi — ma’lumotlar ushbu qurilmada saqlanadi.";
+    actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">Sign in / Sign up</button>';
     return;
   }
   status.textContent = sbBusy ? "☁️ Supabase bilan sinxronlanmoqda..." : (sbLastError ? "⚠️ Sinxronlash xatosi: " + sbLastError : "☁️ Supabase bilan sinxronlangan");
   const name = (window.__sbProfile && window.__sbProfile.name) || "Engliwords foydalanuvchisi";
   actions.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-size:13px;flex:1;min-width:90px">' + String(name).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) + '</div><button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Hozir saqlash</button><button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button></div>';
+  sbEnsureAuthEntry();
 }
 
 // Reuse the existing profile UI render hook, but display Supabase status.
@@ -117,7 +118,6 @@ async function sbHandleSession(session) {
     if (typeof render === "function") render();
   }
 }
-}
 
 function cloudLogin(mode) {
   sbRenderAuthGate(mode || "choice");
@@ -189,9 +189,12 @@ async function cloudUpload() {
 }
 
 function cloudSaveDebounced() {
-  if (!sbUserId) return;
   clearTimeout(sbSaveTimer);
-  sbSaveTimer = setTimeout(() => cloudUpload(), 900);
+  sbSaveTimer = setTimeout(async () => {
+    if (sbUserId) { await cloudUpload(); return; }
+    try { localStorage.setItem("eng-data:local", JSON.stringify(sbNormalizeState(S))); }
+    catch (e) { console.warn("Guest save failed:", e); }
+  }, 700);
 }
 
 async function cloudLogout() {
