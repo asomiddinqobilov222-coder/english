@@ -95,8 +95,10 @@ async function sbHandleSession(session) {
     if (!S.set.nativeLanguage && (window.ENG_LANGUAGES||[]).some(l=>l.code===user.user_metadata?.native_language)) S.set.nativeLanguage=user.user_metadata.native_language;
     if (!S.set.nativeLanguage && savedNative && (window.ENG_LANGUAGES||[]).some(l=>l.code===savedNative)) S.set.nativeLanguage=savedNative;
     let nickname = String(user.user_metadata?.nickname || "").trim();
-    if (!nickname) {
-      nickname = "Engliwords foydalanuvchisi";
+    const metadataLanguage=String(user.user_metadata?.native_language||"");
+    if (!nickname || !(window.ENG_LANGUAGES||[]).some(l=>l.code===String(S?.set?.nativeLanguage||metadataLanguage))) {
+      await sbCompleteProfileSetup(user);
+      nickname=String(user.user_metadata?.nickname||"").trim();
     }
     window.__sbProfile = {name:nickname, picture:user.user_metadata?.avatar_url || user.user_metadata?.picture || ""};
     if (typeof cloud === "object") {
@@ -104,8 +106,7 @@ async function sbHandleSession(session) {
       cloud.ready = true;
       cloud.token = null;
     }
-    if (!S.set.nativeLanguage) await sbChooseNativeLanguage();
-    if (typeof translator !== "undefined") translator.tl = String(S.set.nativeLanguage || "uz");
+    if (typeof translator !== "undefined") translator.tl = String(S.set.nativeLanguage || "en");
     sbLastError = "";
   } catch (e) {
     console.error("Supabase profile setup failed:", e);
@@ -250,18 +251,35 @@ async function sbRestoreSession(source) {
 
 
 
-async function sbChooseNativeLanguage(){
-  const root=document.createElement("div");root.id="sb-native-language-gate";
-  root.style.cssText="position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:18px;background:#030b18d9;backdrop-filter:blur(12px);color:#f3f7ff;font-family:inherit";
-  const options=(window.ENG_LANGUAGES||[]).map(l=>'<option value="'+sbGateEscape(l.code)+'" '+(l.code==='uz'?'selected':'')+'>'+sbGateEscape(l.name)+' — '+sbGateEscape(l.native)+'</option>').join('');
-  root.innerHTML='<form class="gate-card" style="width:min(430px,100%);padding:25px 21px;border:1px solid #ffffff24;border-radius:24px;background:#14243d" onsubmit="event.preventDefault()"><h2>Choose your native language</h2><p>The interface will always remain in English. Your choice will be used for translations, learning exercises, and AI feedback. It cannot be changed later.</p><label for="sb-native-choice">Native language</label><select id="sb-native-choice" required style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box">'+options+'</select><button id="sb-native-save" class="gate-primary" type="submit" style="width:100%;margin-top:16px">Continue</button></form>';
-  document.body.appendChild(root);
-  await new Promise(resolve=>{root.querySelector("form").addEventListener("submit",resolve,{once:true})});
-  const code=root.querySelector("#sb-native-choice").value;
-  if(!(window.ENG_LANGUAGES||[]).some(l=>l.code===code)){root.remove();throw new Error("Invalid native language");}
-  S.set.nativeLanguage=code;
-  if(typeof save==="function") save();
-  root.remove();
+
+function sbFilterNativeOptions(query){
+ const q=String(query||"").trim().toLocaleLowerCase();
+ document.querySelectorAll("#sb-native-options option").forEach(o=>{o.hidden=!!q&&!o.textContent.toLocaleLowerCase().includes(q);});
+}
+async function sbCompleteProfileSetup(user){
+ const currentName=String(user.user_metadata?.nickname||"").trim();
+ const currentLang=String(S?.set?.nativeLanguage||user.user_metadata?.native_language||"");
+ const validLang=(window.ENG_LANGUAGES||[]).some(l=>l.code===currentLang);
+ const root=document.createElement("div");root.id="sb-profile-setup";
+ root.style.cssText="position:fixed;inset:0;z-index:100001;display:grid;place-items:center;padding:18px;background:#030b18d9;backdrop-filter:blur(12px);color:#f3f7ff;font-family:inherit";
+ const opts=(window.ENG_LANGUAGES||[]).map(l=>'<option value="'+sbGateEscape(l.code)+'" '+(l.code===(validLang?currentLang:"uz")?'selected':'')+'>'+sbGateEscape(l.name)+' — '+sbGateEscape(l.native)+'</option>').join('');
+ root.innerHTML='<form id="sb-profile-setup-form" style="width:min(430px,100%);max-height:90dvh;overflow:auto;padding:25px 21px;border:1px solid #ffffff24;border-radius:24px;background:linear-gradient(145deg,#172b47,#101e34);box-shadow:0 24px 70px #0007"><h2 style="margin:0 0 8px">Complete your profile</h2><p style="color:#b5c6dc;font-size:13px;line-height:1.5">Choose a nickname and your native language. The app interface always stays in English. Your native language is used only for translations and learning exercises and cannot be changed later.</p><label for="sb-profile-nickname" style="display:block;margin:13px 0 6px;font-size:12px;color:#c7d6e8;font-weight:700">Nickname</label><input id="sb-profile-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Your nickname" value="'+sbGateEscape(currentName)+'" required style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box"><label for="sb-native-search" style="display:block;margin:13px 0 6px;font-size:12px;color:#c7d6e8;font-weight:700">Search native language</label><input id="sb-native-search" type="search" placeholder="Type a language name..." oninput="sbFilterNativeOptions(this.value)" style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box"><select id="sb-native-options" size="6" required style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box">'+opts+'</select><p id="sb-profile-error" style="color:#ff9aa5;font-size:12px"></p><button type="submit" style="width:100%;margin-top:12px;padding:13px;border:0;border-radius:13px;background:linear-gradient(120deg,#75e5d2,#a0f0dc);color:#071b20;font:inherit;font-weight:800">Save and continue</button></form>';
+ document.body.appendChild(root);
+ await new Promise(resolve=>root.querySelector("form").addEventListener("submit",e=>{e.preventDefault();resolve()}, {once:true}));
+ const nickname=String(root.querySelector("#sb-profile-nickname").value||"").trim();
+ const nativeLanguage=String(root.querySelector("#sb-native-options").value||"");
+ if(nickname.length<2||nickname.length>24||!(window.ENG_LANGUAGES||[]).some(l=>l.code===nativeLanguage)){
+  root.querySelector("#sb-profile-error").textContent="Enter a nickname (2–24 characters) and choose a language.";
+  await new Promise(resolve=>setTimeout(resolve,900));
+  root.remove();throw new Error("Profile details are incomplete.");
+ }
+ const {data,error}=await supabaseClient.auth.updateUser({data:{nickname,native_language:nativeLanguage}});
+ if(error){root.remove();throw error;}
+ S.set.nativeLanguage=nativeLanguage;
+ if(typeof save==="function")save();
+ if(typeof cloud==="object"&&cloud.user)cloud.user.name=nickname;
+ window.__sbProfile={...(window.__sbProfile||{}),name:nickname};
+ root.remove();
 }
 
 function sbGateEscape(v) {
