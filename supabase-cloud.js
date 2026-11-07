@@ -117,7 +117,7 @@ async function sbHandleSession(session) {
       const guest = JSON.parse(localStorage.getItem("eng-data:local") || "null");
       S = guest && typeof guest === "object" ? sbNormalizeState(guest) : sbNormalizeState(defaults());
     } catch { S = sbNormalizeState(defaults()); }
-    if (typeof toast === "function") toast("Profil yuklanmadi. Mehmon rejimida davom etishingiz mumkin.");
+    if (typeof toast === "function") toast("Your profile could not be loaded. You can continue as a guest.");
   } finally {
     sbBusy = false;
     sbHandlingUser = null;
@@ -132,36 +132,29 @@ function cloudLogin(mode) {
 async function sbSubmitAuth(mode) {
   const email = String(document.getElementById("sb-auth-email")?.value || "").trim();
   const password = String(document.getElementById("sb-auth-password")?.value || "");
-  const nickname = String(document.getElementById("sb-auth-nickname")?.value || "").trim();
-  const nativeLanguage = String(document.getElementById("sb-auth-native-language")?.value || "");
   const errorBox = document.getElementById("sb-auth-error");
   const submit = document.getElementById("sb-auth-submit");
   const showError = message => { if (errorBox) errorBox.textContent = message; };
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError("To‘g‘ri email manzil kiriting.");
-  if (password.length < 6) return showError("Parol kamida 6 ta belgidan iborat bo‘lishi kerak.");
-  if (mode === "signup" && (nickname.length < 2 || nickname.length > 24)) return showError("Nickname must contain 2–24 characters.");
-  if (mode === "signup" && !(window.ENG_LANGUAGES||[]).some(l=>l.code===nativeLanguage)) return showError("Choose your native language.");
-  if (submit) { submit.disabled = true; submit.textContent = mode === "signup" ? "Profil yaratilmoqda…" : "Kirilmoqda…"; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError("Enter a valid email address.");
+  if (password.length < 6) return showError("Password must contain at least 6 characters.");
+  if (submit) { submit.disabled = true; submit.textContent = mode === "signup" ? "Creating account…" : "Signing in…"; }
   try {
     if (mode === "signup") {
-      const {data,error} = await supabaseClient.auth.signUp({
-        email, password,
-        options: {data:{nickname,native_language:nativeLanguage}}
-      });
+      const {data,error} = await supabaseClient.auth.signUp({email,password});
       if (error) throw error;
       if (data.session) {
         sbCloseAuthGate();
         await sbHandleSession(data.session);
-        if (typeof toast === "function") toast("Profil yaratildi. Xush kelibsiz, " + nickname + "!");
+        if (typeof toast === "function") toast("Your account has been created.");
       } else {
-        sbRenderAuthGate("message", "Tasdiqlash xabari emailingizga yuborildi. Emailni tasdiqlagach, Sign in orqali kiring.");
+        sbRenderAuthGate("message", "A confirmation email has been sent. Verify your email, then sign in.");
       }
     } else {
       const {data,error} = await supabaseClient.auth.signInWithPassword({email,password});
       if (error) throw error;
       sbCloseAuthGate();
       await sbHandleSession(data.session);
-      if (typeof toast === "function") toast("Profilga muvaffaqiyatli kirdingiz.");
+      if (typeof toast === "function") toast("You are signed in.");
     }
   } catch (e) {
     console.error("Email/password authentication failed:",e);
@@ -275,6 +268,7 @@ async function sbCompleteProfileSetup(user){
  }
  const {data,error}=await supabaseClient.auth.updateUser({data:{nickname,native_language:nativeLanguage}});
  if(error){root.remove();throw error;}
+ if(data?.user?.user_metadata)user.user_metadata=data.user.user_metadata;
  S.set.nativeLanguage=nativeLanguage;
  if(typeof save==="function")save();
  if(typeof cloud==="object"&&cloud.user)cloud.user.name=nickname;
@@ -301,7 +295,6 @@ function sbRenderAuthGate(mode="choice", message="") {
   if(mode==="signin"||mode==="signup"){
     const isUp=mode==="signup";
     root.innerHTML='<form class="gate-card" onsubmit="event.preventDefault();sbSubmitAuth(\''+mode+'\')">'+close+'<h2>'+(isUp?"Create account":"Sign in")+'</h2><p>'+(isUp?"Create your personal Engliwords profile.":"Sign in to your existing Engliwords profile.")+'</p>'+
-      (isUp?'<label for="sb-auth-nickname">Nickname</label><input id="sb-auth-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Your nickname" required><label for="sb-auth-native-language">Your native language</label><select id="sb-auth-native-language" required style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box">'+(window.ENG_LANGUAGES||[]).map(l=>'<option value="'+sbGateEscape(l.code)+'" '+(l.code==='uz'?'selected':'')+'>'+sbGateEscape(l.name)+' — '+sbGateEscape(l.native)+'</option>').join('')+'</select><p class="gate-note">The app interface stays in English. This language is used for translations and AI explanations and cannot be changed later.</p>':'')+
       '<label for="sb-auth-email">Gmail / Email</label><input id="sb-auth-email" type="email" autocomplete="email" placeholder="name@gmail.com" required><label for="sb-auth-password">Password</label><input id="sb-auth-password" type="password" minlength="6" autocomplete="'+(isUp?"new-password":"current-password")+'" placeholder="At least 6 characters" required><p class="gate-error" id="sb-auth-error">'+sbGateEscape(message)+'</p><button id="sb-auth-submit" class="gate-primary" type="submit">'+(isUp?"Sign up":"Sign in")+'</button><button class="gate-secondary" type="button" onclick="sbRenderAuthGate(\''+(isUp?"signin":"signup")+'\')">'+(isUp?"Already have an account? Sign in":"New here? Sign up")+'</button></form>';
     setTimeout(()=>document.getElementById("sb-auth-email")?.focus(),0);
   } else if(mode==="message"){
