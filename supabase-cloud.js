@@ -198,7 +198,6 @@ function cloudSaveDebounced() {
 }
 
 async function cloudLogout() {
-  if (!confirm("Profildan chiqilsinmi?")) return;
   try {
     const {error} = await supabaseClient.auth.signOut();
     if (error) throw error;
