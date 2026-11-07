@@ -129,7 +129,7 @@ async function sbHandleSession(session) {
 function cloudLogin(mode) {
   sbRenderAuthGate(mode || "choice");
 }
-async async function sbSubmitAuth(mode) {
+async function sbSubmitAuth(mode) {
   const email = String(document.getElementById("sb-auth-email")?.value || "").trim();
   const password = String(document.getElementById("sb-auth-password")?.value || "");
   const errorBox = document.getElementById("sb-auth-error");
