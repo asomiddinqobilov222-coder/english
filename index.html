@@ -643,8 +643,7 @@ profilePage=function(){
  const d=document.createElement('div');d.innerHTML=_prof();
  d.querySelector('.screen-title')?.remove();
  d.querySelectorAll('section').forEach(el=>{if(el.querySelector('#groq-key')||/Grok \/ Groq AI agenti/.test(el.textContent||''))el.remove()});
- const ai='<section class="panel ai-row"><b>AI xizmati</b><p class="subhead">AI kaliti serverda xavfsiz saqlanadi; foydalanuvchidan API kaliti talab qilinmaydi.</p></section>';
- return ai+d.innerHTML
+ return d.innerHTML
 };
 function cleanProfile(){const run=()=>document.querySelectorAll('#app > *').forEach(el=>{if(/Supabase|Hozir saqlash|sinxron/i.test(el.textContent||''))el.remove()});run();setTimeout(run,300);setTimeout(run,1200)}
 
