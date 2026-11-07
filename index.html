@@ -660,7 +660,7 @@ addTranslatorWord=async function(){
 window.confirmTranslatorWord=function(){
  const word=String(document.querySelector('#dict-word')?.value||'').trim(),translation=String(document.querySelector('#dict-translation')?.value||'').trim(),custom=String(document.querySelector('#dict-custom-translation')?.value||'').trim();
  if(!word||!translation)return toast('Enter the word and its translation.');
- if(S.words.some(w=>w.word.trim().toLowerCase()===word.toLowerCase()))return toast('Bu so‘z yoki ibora lug‘atda allaqachon bor.');
+ if(S.words.some(w=>w.word.trim().toLowerCase()===word.toLowerCase()))return toast('This word or phrase is already in your vocabulary.');
  const w={id:uid(),word,translation:custom?translation+' ('+custom+')':translation,added:today(),done:[],examples:{easy:null,normal:null,hard:null},learning:{status:'new',scores:{}}};
  S.words.push(w);const p=progressFor();if(!p.words.includes(w.id))p.words.push(w.id);save();document.querySelector('#modal-root').innerHTML='';toast('Word added to your vocabulary.');render();
 };
