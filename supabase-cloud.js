@@ -140,7 +140,13 @@ async function sbSubmitAuth(mode) {
   if (submit) { submit.disabled = true; submit.textContent = mode === "signup" ? "Creating account…" : "Signing in…"; }
   try {
     if (mode === "signup") {
-      const {data,error} = await supabaseClient.auth.signUp({email,password});
+      const {data,error} = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: "https://engliwords.asomiddinqobilov222.workers.dev/"
+        }
+      });
       if (error) throw error;
       if (data.session) {
         sbCloseAuthGate();
