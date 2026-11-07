@@ -105,6 +105,7 @@ async function sbHandleSession(session) {
       cloud.token = null;
     }
     if (!S.set.nativeLanguage) await sbChooseNativeLanguage();
+    if (typeof translator !== "undefined") translator.tl = String(S.set.nativeLanguage || "uz");
     sbLastError = "";
   } catch (e) {
     console.error("Supabase profile setup failed:", e);
