@@ -36,13 +36,13 @@ function sbRender() {
   const actions = document.getElementById("cloud-actions");
   if (!status || !actions) return;
   if (!sbUserId) {
-    status.textContent = "Mehmon rejimi — ma’lumotlar ushbu qurilmada saqlanadi.";
+    status.textContent = "Guest mode — data is saved on this device.";
     actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">Sign in / Sign up</button>';
     return;
   }
-  status.textContent = sbBusy ? "☁️ Supabase bilan sinxronlanmoqda..." : (sbLastError ? "⚠️ Sinxronlash xatosi: " + sbLastError : "☁️ Supabase bilan sinxronlangan");
-  const name = (window.__sbProfile && window.__sbProfile.name) || "Engliwords foydalanuvchisi";
-  actions.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-size:13px;flex:1;min-width:90px">' + String(name).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) + '</div><button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Hozir saqlash</button><button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Chiqish</button></div>';
+  status.textContent = sbBusy ? "☁️ Syncing with Supabase..." : (sbLastError ? "⚠️ Sync error: " + sbLastError : "☁️ Synced with Supabase");
+  const name = (window.__sbProfile && window.__sbProfile.name) || "Engliwords user";
+  actions.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-size:13px;flex:1;min-width:90px">' + String(name).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) + '</div><button onclick="cloudUpload()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">☁️ Save now</button><button onclick="cloudLogout()" style="padding:8px 10px;border:0;border-radius:10px;cursor:pointer">Sign out</button></div>';
   sbEnsureAuthEntry();
 }
 
@@ -110,7 +110,7 @@ async function sbHandleSession(session) {
     sbLastError = "";
   } catch (e) {
     console.error("Supabase profile setup failed:", e);
-    sbLastError = e?.message || "Profil ma’lumotlarini yuklab bo‘lmadi";
+    sbLastError = e?.message || "Could not load profile data";
     sbUserId = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; }
     try {
@@ -129,7 +129,7 @@ async function sbHandleSession(session) {
 function cloudLogin(mode) {
   sbRenderAuthGate(mode || "choice");
 }
-async function sbSubmitAuth(mode) {
+async async function sbSubmitAuth(mode) {
   const email = String(document.getElementById("sb-auth-email")?.value || "").trim();
   const password = String(document.getElementById("sb-auth-password")?.value || "");
   const errorBox = document.getElementById("sb-auth-error");
@@ -171,7 +171,7 @@ async function cloudUpload() {
   sbRender();
   try {
     const {data: userResult, error: userError} = await supabaseClient.auth.getUser();
-    if (userError || !userResult?.user || userResult.user.id !== sbUserId) throw userError || new Error("Akkaunt tasdiqlanmadi.");
+    if (userError || !userResult?.user || userResult.user.id !== sbUserId) throw userError || new Error("Account verification failed.");
     const {error} = await supabaseClient.from("user_data").upsert({
       user_id: sbUserId,
       data: sbNormalizeState(S),
@@ -182,7 +182,7 @@ async function cloudUpload() {
 
   } catch (e) {
     console.error("Supabase save failed:", e);
-    sbLastError = e?.message || "Saqlash amalga oshmadi";
+    sbLastError = e?.message || "Save failed";
 
   } finally {
     sbBusy = false;
@@ -350,7 +350,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     await sbRestoreSession("startup");
   } catch (e) {
     console.error("Supabase initialization failed:", e);
-    sbLastError = e?.message || "Boshlashda xatolik";
+    sbLastError = e?.message || "Initialization failed";
     sbRender();
     sbEnsureAuthEntry();
   }
