@@ -19,7 +19,7 @@ let sbLastError = "";
 let sbHandlingUser = null;
 
 function sbNormalizeState(data) {
-  const d = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:"en-US"},history:{}};
+  const d = typeof defaults === "function" ? defaults() : {words:[],progress:{},cache:{s:{},t:{}},set:{sound:true,vib:true,accent:"en-US",nativeLanguage:""},history:{}};
   const x = data && typeof data === "object" && !Array.isArray(data) ? data : {};
   return {
     ...d, ...x,
@@ -90,6 +90,10 @@ async function sbHandleSession(session) {
   sbUserId = user.id;
   try {
     await sbLoadOrMigrate(user);
+    const savedNative = String(S?.set?.nativeLanguage || user.user_metadata?.native_language || "");
+    if (!S.set) S.set = {};
+    if (!S.set.nativeLanguage && (window.ENG_LANGUAGES||[]).some(l=>l.code===user.user_metadata?.native_language)) S.set.nativeLanguage=user.user_metadata.native_language;
+    if (!S.set.nativeLanguage && savedNative && (window.ENG_LANGUAGES||[]).some(l=>l.code===savedNative)) S.set.nativeLanguage=savedNative;
     let nickname = String(user.user_metadata?.nickname || "").trim();
     if (!nickname) {
       nickname = "Engliwords foydalanuvchisi";
@@ -100,6 +104,7 @@ async function sbHandleSession(session) {
       cloud.ready = true;
       cloud.token = null;
     }
+    if (!S.set.nativeLanguage) await sbChooseNativeLanguage();
     sbLastError = "";
   } catch (e) {
     console.error("Supabase profile setup failed:", e);
@@ -126,18 +131,20 @@ async function sbSubmitAuth(mode) {
   const email = String(document.getElementById("sb-auth-email")?.value || "").trim();
   const password = String(document.getElementById("sb-auth-password")?.value || "");
   const nickname = String(document.getElementById("sb-auth-nickname")?.value || "").trim();
+  const nativeLanguage = String(document.getElementById("sb-auth-native-language")?.value || "");
   const errorBox = document.getElementById("sb-auth-error");
   const submit = document.getElementById("sb-auth-submit");
   const showError = message => { if (errorBox) errorBox.textContent = message; };
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError("To‘g‘ri email manzil kiriting.");
   if (password.length < 6) return showError("Parol kamida 6 ta belgidan iborat bo‘lishi kerak.");
-  if (mode === "signup" && (nickname.length < 2 || nickname.length > 24)) return showError("Nickname 2–24 ta belgidan iborat bo‘lishi kerak.");
+  if (mode === "signup" && (nickname.length < 2 || nickname.length > 24)) return showError("Nickname must contain 2–24 characters.");
+  if (mode === "signup" && !(window.ENG_LANGUAGES||[]).some(l=>l.code===nativeLanguage)) return showError("Choose your native language.");
   if (submit) { submit.disabled = true; submit.textContent = mode === "signup" ? "Profil yaratilmoqda…" : "Kirilmoqda…"; }
   try {
     if (mode === "signup") {
       const {data,error} = await supabaseClient.auth.signUp({
         email, password,
-        options: {data:{nickname}}
+        options: {data:{nickname,native_language:nativeLanguage}}
       });
       if (error) throw error;
       if (data.session) {
@@ -241,6 +248,21 @@ async function sbRestoreSession(source) {
 }
 
 
+
+async function sbChooseNativeLanguage(){
+  const root=document.createElement("div");root.id="sb-native-language-gate";
+  root.style.cssText="position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:18px;background:#030b18d9;backdrop-filter:blur(12px);color:#f3f7ff;font-family:inherit";
+  const options=(window.ENG_LANGUAGES||[]).map(l=>'<option value="'+sbGateEscape(l.code)+'" '+(l.code==='uz'?'selected':'')+'>'+sbGateEscape(l.name)+' — '+sbGateEscape(l.native)+'</option>').join('');
+  root.innerHTML='<form class="gate-card" style="width:min(430px,100%);padding:25px 21px;border:1px solid #ffffff24;border-radius:24px;background:#14243d" onsubmit="event.preventDefault()"><h2>Choose your native language</h2><p>The interface will always remain in English. Your choice will be used for translations, learning exercises, and AI feedback. It cannot be changed later.</p><label for="sb-native-choice">Native language</label><select id="sb-native-choice" required style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box">'+options+'</select><button id="sb-native-save" class="gate-primary" type="submit" style="width:100%;margin-top:16px">Continue</button></form>';
+  document.body.appendChild(root);
+  await new Promise(resolve=>{root.querySelector("form").addEventListener("submit",resolve,{once:true})});
+  const code=root.querySelector("#sb-native-choice").value;
+  if(!(window.ENG_LANGUAGES||[]).some(l=>l.code===code)){root.remove();throw new Error("Invalid native language");}
+  S.set.nativeLanguage=code;
+  if(typeof save==="function") save();
+  root.remove();
+}
+
 function sbGateEscape(v) {
   return String(v || "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
@@ -260,7 +282,7 @@ function sbRenderAuthGate(mode="choice", message="") {
   if(mode==="signin"||mode==="signup"){
     const isUp=mode==="signup";
     root.innerHTML='<form class="gate-card" onsubmit="event.preventDefault();sbSubmitAuth(\''+mode+'\')">'+close+'<h2>'+(isUp?"Create account":"Sign in")+'</h2><p>'+(isUp?"Create your personal Engliwords profile.":"Sign in to your existing Engliwords profile.")+'</p>'+
-      (isUp?'<label for="sb-auth-nickname">Nickname</label><input id="sb-auth-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Your nickname" required>':'')+
+      (isUp?'<label for="sb-auth-nickname">Nickname</label><input id="sb-auth-nickname" type="text" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Your nickname" required><label for="sb-auth-native-language">Your native language</label><select id="sb-auth-native-language" required style="width:100%;padding:13px;border-radius:12px;border:1px solid #3a506d;background:#091629;color:#fff;font:inherit;box-sizing:border-box">'+(window.ENG_LANGUAGES||[]).map(l=>'<option value="'+sbGateEscape(l.code)+'" '+(l.code==='uz'?'selected':'')+'>'+sbGateEscape(l.name)+' — '+sbGateEscape(l.native)+'</option>').join('')+'</select><p class="gate-note">The app interface stays in English. This language is used for translations and AI explanations and cannot be changed later.</p>':'')+
       '<label for="sb-auth-email">Gmail / Email</label><input id="sb-auth-email" type="email" autocomplete="email" placeholder="name@gmail.com" required><label for="sb-auth-password">Password</label><input id="sb-auth-password" type="password" minlength="6" autocomplete="'+(isUp?"new-password":"current-password")+'" placeholder="At least 6 characters" required><p class="gate-error" id="sb-auth-error">'+sbGateEscape(message)+'</p><button id="sb-auth-submit" class="gate-primary" type="submit">'+(isUp?"Sign up":"Sign in")+'</button><button class="gate-secondary" type="button" onclick="sbRenderAuthGate(\''+(isUp?"signin":"signup")+'\')">'+(isUp?"Already have an account? Sign in":"New here? Sign up")+'</button></form>';
     setTimeout(()=>document.getElementById("sb-auth-email")?.focus(),0);
   } else if(mode==="message"){
