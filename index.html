@@ -1380,14 +1380,14 @@ body .app .translator-action-row .translator-icon-btn.translate{margin-left:0}
 body .app .translator-action-row .translator-icon-btn.mic.is-listening{background:linear-gradient(135deg,#ff9ba8,#ff617b);color:#3b0811;border-color:#ffc0c8}
 @media(max-width:420px){body .app .translator-action-row{gap:10px}body .app .translator-action-row .translator-icon-btn{flex-basis:44px;width:44px;height:44px}}
 
-/* Unified button palette for app actions, including navigation and exercise controls.
-   Keep only switches, flashcard surfaces, and answer/result feedback states distinct. */
-button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening){
+/* Unified palette for ordinary action buttons only.
+   Preserve the original streak/theme controls and the bottom navigation's inactive/active states. */
+button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
   background:linear-gradient(135deg,#74f2df,#65bfff 58%,#a4a0ff)!important;
   color:#101735!important;
   border:1px solid #ffffff55!important;
 }
-body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening){
+body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
   background:linear-gradient(145deg,#38c9b5,#198fba 65%,#4b77e8)!important;
   color:#fff!important;
   border:1px solid #ffffff75!important;
