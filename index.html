@@ -334,7 +334,7 @@ async function checkLiveSpelling(value,fullText){
    .filter(x=>x.word&&x.word.toLowerCase()!==value.toLowerCase()&&x.d>0&&x.d<=Math.min(2,value.length>=7?2:1)&&/^[a-z]+(?:['-][a-z]+)*$/i.test(x.word))
    .sort((x,y)=>x.d-y.d||y.score-x.score||y.word.length-x.word.length)[0];
   if(!candidate){hideNotice();return}
-  box.className='spell-live show';box.innerHTML='<strong>⚠️ Word isn't found:</strong> <span>'+esc(value)+'</span> → <strong>'+esc(candidate.word)+'</strong> <button type="button" id="spell-live-fix">Tuzatish</button>';
+  box.className='spell-live show';box.innerHTML='<strong>⚠️ Word isn\'t found:</strong> <span>'+esc(value)+'</span> → <strong>'+esc(candidate.word)+'</strong> <button type="button" id="spell-live-fix">Tuzatish</button>';
   $('#spell-live-fix')?.addEventListener('click',()=>{const input=$('#src');if(!input)return;const currentText=input.value,pos=currentText.lastIndexOf(value);if(pos<0)return;input.value=currentText.slice(0,pos)+candidate.word+currentText.slice(pos+value.length);translator.source=input.value;translator.result='';hideNotice();if(window.translatorDebounce)clearTimeout(window.translatorDebounce);translateText(true);scheduleLiveSpellcheck()});
  }catch(error){if(error?.name!=='AbortError'&&current())hideNotice()}
 }
