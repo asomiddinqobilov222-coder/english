@@ -36,7 +36,7 @@ function sbRender() {
   const actions = document.getElementById("cloud-actions");
   if (!status || !actions) return;
   if (!sbUserId) {
-    status.textContent = "Guest mode — data is saved on this device.";
+    status.textContent = "Guest mode — sign in to save your words and progress.";
     actions.innerHTML = '<button onclick="cloudLogin()" style="padding:10px 14px;border:0;border-radius:12px;cursor:pointer">Sign in / Sign up</button>';
     return;
   }
@@ -73,10 +73,7 @@ async function sbHandleSession(session) {
     sbBusy = false;
     window.__sbProfile = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; cloud.token = null; }
-    try {
-      const guest = JSON.parse(localStorage.getItem("eng-data:local") || "null");
-      S = guest && typeof guest === "object" ? sbNormalizeState(guest) : sbNormalizeState(defaults());
-    } catch { S = sbNormalizeState(defaults()); }
+    S = sbNormalizeState(defaults());
     sbRender();
     sbEnsureAuthEntry();
     if (typeof render === "function") render();
@@ -113,16 +110,14 @@ async function sbHandleSession(session) {
     sbLastError = e?.message || "Could not load profile data";
     sbUserId = null;
     if (typeof cloud === "object") { cloud.user = null; cloud.ready = false; }
-    try {
-      const guest = JSON.parse(localStorage.getItem("eng-data:local") || "null");
-      S = guest && typeof guest === "object" ? sbNormalizeState(guest) : sbNormalizeState(defaults());
-    } catch { S = sbNormalizeState(defaults()); }
+    S = sbNormalizeState(defaults());
     if (typeof toast === "function") toast("Your profile could not be loaded. You can continue as a guest.");
   } finally {
     sbBusy = false;
     sbHandlingUser = null;
     sbRender();
     if (typeof render === "function") render();
+    if (typeof window.engliwordsAfterAuth === "function") window.engliwordsAfterAuth();
   }
 }
 
@@ -198,10 +193,9 @@ async function cloudUpload() {
 
 function cloudSaveDebounced() {
   clearTimeout(sbSaveTimer);
+  if (!sbUserId) return;
   sbSaveTimer = setTimeout(async () => {
-    if (sbUserId) { await cloudUpload(); return; }
-    try { localStorage.setItem("eng-data:local", JSON.stringify(sbNormalizeState(S))); }
-    catch (e) { console.warn("Guest save failed:", e); }
+    if (sbUserId) await cloudUpload();
   }, 700);
 }
 
@@ -224,8 +218,8 @@ async function cloudLogout() {
 
 try { localStorage.removeItem("eng-cloud-profile"); localStorage.removeItem("eng-cloud-linked"); } catch {}
 
-// Preserve guest-mode data locally; remove only the obsolete pre-account key.
-try { localStorage.removeItem("eng"); } catch {}
+// Remove legacy guest vocabulary/progress stored on this device.
+try { localStorage.removeItem("eng-data:local"); localStorage.removeItem("eng"); } catch {}
 
 // Re-read persisted auth state when the PWA becomes visible. Some Android
 // standalone launches can deliver an early empty INITIAL_SESSION event while
@@ -322,9 +316,9 @@ function sbEnsureAuthEntry(){
 }
 function cloudSaveDebounced(){
   clearTimeout(sbSaveTimer);
+  if(!sbUserId)return;
   sbSaveTimer=setTimeout(async()=>{
-    if(sbUserId){await cloudUpload();return;}
-    try{localStorage.setItem("eng-data:local",JSON.stringify(sbNormalizeState(S)));}catch(e){console.warn("Guest save failed:",e);}
+    if(sbUserId)await cloudUpload();
   },700);
 }
 window.sbCloseAuthGate=sbCloseAuthGate;
