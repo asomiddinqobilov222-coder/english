@@ -200,6 +200,23 @@ body::after{animation:star-twinkle 4.8s ease-in-out infinite alternate}
 @keyframes star-twinkle{0%{opacity:.24}35%{opacity:.58}62%{opacity:.32}100%{opacity:.68}}
 @media(prefers-reduced-motion:reduce){body::after{animation:none!important}button,.choice,#app{animation:none!important;transition:none!important}}
 
+
+/* All action buttons use the same style as the “Ha, chiqish” confirmation button */
+.btn,.btn.primary,.btn.secondary,.btn.ghost,.btn.danger{
+  background:linear-gradient(120deg,var(--cyan),#87f0d4)!important;
+  color:#07171a!important;
+  border:0!important;
+}
+body[data-theme="day"] .btn,
+body[data-theme="day"] .btn.primary,
+body[data-theme="day"] .btn.secondary,
+body[data-theme="day"] .btn.ghost,
+body[data-theme="day"] .btn.danger{
+  background:linear-gradient(120deg,#168c91,#237db4)!important;
+  color:#fff!important;
+  border:0!important;
+}
+
 </style></head><body><main id="app" class="app"></main><nav id="nav" class="bottom-nav"></nav><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="modal-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="cloud.js"></script><script src="supabase-cloud.js"></script><script>
 'use strict';
