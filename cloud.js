@@ -25,8 +25,7 @@ function cloudDataStorageKey(user = cloud.user) {
   return identity ? "eng-data:" + encodeURIComponent(String(identity).toLowerCase()) : "eng-data:local";
 }
 function saveLocal() {
-  try { localStorage.setItem(cloudDataStorageKey(), JSON.stringify(S)); }
-  catch (error) { console.warn("Local backup could not be saved:", error); if (typeof toast === "function") toast("Qurilmadagi zaxira saqlanmadi. Xotira joyini tekshiring."); }
+  // App vocabulary and progress are stored in Supabase, never in browser storage.
 }
 try {
   const remembered = JSON.parse(localStorage.getItem(CLOUD_PROFILE_KEY) || "null");
@@ -158,19 +157,8 @@ function cloudLogin() {
 
       try {
         await cloudLoadUser();
-        const currentIdentity = cloud.user?.email?.toLowerCase() || "";
-        let profileSnapshot = null;
-        try {
-          const raw = localStorage.getItem(cloudDataStorageKey());
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object" && Array.isArray(parsed.words)) profileSnapshot = parsed;
-          }
-        } catch {}
-        cloud.preserveCurrentIfMissing = Boolean(profileSnapshot) || !previousIdentity || previousIdentity === currentIdentity;
-        S = profileSnapshot
-          ? {...defaults(), ...profileSnapshot}
-          : cloud.preserveCurrentIfMissing ? localSnapshot : defaults();
+        cloud.preserveCurrentIfMissing = false;
+        S = defaults();
 
         await cloudLoadFile();
 
