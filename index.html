@@ -1379,6 +1379,18 @@ body .app .translator-action-row .translator-icon-btn.hide{display:none!importan
 body .app .translator-action-row .translator-icon-btn.translate{margin-left:0}
 body .app .translator-action-row .translator-icon-btn.mic.is-listening{background:linear-gradient(135deg,#ff9ba8,#ff617b);color:#3b0811;border-color:#ffc0c8}
 @media(max-width:420px){body .app .translator-action-row{gap:10px}body .app .translator-action-row .translator-icon-btn{flex-basis:44px;width:44px;height:44px}}
+
+/* Unified button palette: match the confirmation primary button */
+button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.bottom-nav button.active){
+  background:linear-gradient(135deg,#74f2df,#65bfff 58%,#a4a0ff);
+  color:#101735;
+  border:1px solid #ffffff55;
+}
+body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.bottom-nav button.active){
+  background:linear-gradient(145deg,#38c9b5,#198fba 65%,#4b77e8);
+  color:#fff;
+  border:1px solid #ffffff75;
+}
 </style>
 
 
