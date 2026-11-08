@@ -627,7 +627,7 @@ home=function(){
  return `<div class="top2"><h1 class="bigbrand">Engliwords</h1><div class="topr"><button type="button" class="streak ${dying?'dying':''}" onclick="openCalendar()" aria-label="Daily streak"><b>${n}</b><span class="flame">🔥</span></button><button type="button" class="theme-toggle" onclick="toggleTheme()"></button></div></div>
 <div class="panel hp-today"><div class="tl"><b class="bigt">Today:</b><span class="subhead">${done}/4 tasks completed</span><button class="btn primary small" onclick="go('tasks')">Keep going</button></div><div class="barrow">${bar(pct)}<span class="percent">${pct}%</span></div></div>
 <div class="panel addrow"><span>Add a word</span><button type="button" class="plus" onclick="go('add')" aria-label="Add a word">+</button></div>
-<section class="panel hp-prog"><h3 class="section-title">progress</h3><div class="chart-wrap">${chart()}</div><div class="hp-stats"><b>Wordlar: ${S.words.length}</b><b>Today: ${dueWords().length}</b></div></section>`};
+<section class="panel hp-prog"><h3 class="section-title">progress</h3><div class="chart-wrap">${chart()}</div><div class="hp-stats"><b>Words: ${S.words.length}</b><b>Today: ${dueWords().length}</b></div></section>`};
 
 chart=function(){
  const now=new Date(),days=[];
@@ -1380,18 +1380,73 @@ body .app .translator-action-row .translator-icon-btn.translate{margin-left:0}
 body .app .translator-action-row .translator-icon-btn.mic.is-listening{background:linear-gradient(135deg,#ff9ba8,#ff617b);color:#3b0811;border-color:#ffc0c8}
 @media(max-width:420px){body .app .translator-action-row{gap:10px}body .app .translator-action-row .translator-icon-btn{flex-basis:44px;width:44px;height:44px}}
 
-/* Unified button palette: match the confirmation primary button */
-button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.bottom-nav button.active){
-  background:linear-gradient(135deg,#74f2df,#65bfff 58%,#a4a0ff);
-  color:#101735;
-  border:1px solid #ffffff55;
+/* Unified button palette for app actions, including navigation and exercise controls.
+   Keep only switches, flashcard surfaces, and answer/result feedback states distinct. */
+button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening){
+  background:linear-gradient(135deg,#74f2df,#65bfff 58%,#a4a0ff)!important;
+  color:#101735!important;
+  border:1px solid #ffffff55!important;
 }
-body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.bottom-nav button.active){
-  background:linear-gradient(145deg,#38c9b5,#198fba 65%,#4b77e8);
-  color:#fff;
-  border:1px solid #ffffff75;
+body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening){
+  background:linear-gradient(145deg,#38c9b5,#198fba 65%,#4b77e8)!important;
+  color:#fff!important;
+  border:1px solid #ffffff75!important;
 }
 </style>
 
 
+<script id="engliwords-account-gates">
+(function(){
+  const signedIn=()=>Boolean(window.cloud&&cloud.ready&&cloud.user);
+  const originalGo=go;
+  go=function(target){
+    if(target==='add'&&!signedIn()){
+      window.engliwordsPendingAuthAction='translator';
+      cloudLogin();
+      return;
+    }
+    return originalGo(target);
+  };
+  const originalAdd=window.addTranslatorWord;
+  window.addTranslatorWord=async function(){
+    if(!signedIn()){
+      window.engliwordsPendingAuthAction='dictionary';
+      cloudLogin();
+      return;
+    }
+    return originalAdd.apply(this,arguments);
+  };
+  const originalConfirm=window.confirmTranslatorWord;
+  if(originalConfirm)window.confirmTranslatorWord=function(){
+    if(!signedIn()){
+      window.engliwordsPendingAuthAction='dictionary';
+      document.querySelector('#modal-root').innerHTML='';
+      cloudLogin();
+      return;
+    }
+    return originalConfirm.apply(this,arguments);
+  };
+  const originalProfile=profilePage;
+  profilePage=function(){
+    const root=document.createElement('div');
+    root.innerHTML=originalProfile();
+    root.querySelectorAll('section').forEach(section=>{
+      const heading=section.querySelector('h2,h3,h4');
+      if(heading&&/AI assistant/i.test(heading.textContent||''))section.remove();
+    });
+    return root.innerHTML;
+  };
+  window.engliwordsAfterAuth=function(){
+    const action=window.engliwordsPendingAuthAction;
+    if(!action||!signedIn())return;
+    window.engliwordsPendingAuthAction=null;
+    if(action==='translator')go('translator');
+    else if(action==='dictionary'){
+      go('translator');
+      Promise.resolve().then(()=>window.addTranslatorWord());
+    }
+  };
+  render();
+})();
+</script>
 </body></html>
