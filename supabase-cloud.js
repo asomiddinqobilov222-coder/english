@@ -218,8 +218,16 @@ async function cloudLogout() {
 
 try { localStorage.removeItem("eng-cloud-profile"); localStorage.removeItem("eng-cloud-linked"); } catch {}
 
-// Remove legacy guest vocabulary/progress stored on this device.
-try { localStorage.removeItem("eng-data:local"); localStorage.removeItem("eng"); } catch {}
+// Remove all legacy local copies of vocabulary and progress.
+try {
+  const legacyKeys=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(key&&key.startsWith("eng-data:"))legacyKeys.push(key);
+  }
+  legacyKeys.forEach(key=>localStorage.removeItem(key));
+  localStorage.removeItem("eng");
+} catch {}
 
 // Re-read persisted auth state when the PWA becomes visible. Some Android
 // standalone launches can deliver an early empty INITIAL_SESSION event while
