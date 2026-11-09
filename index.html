@@ -247,7 +247,7 @@ function persistAiKey(_key,provider,model){aiProvider='groq';if(model)aiModel=mo
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),lastReviewedOn:String(w.lastReviewedOn||w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
-const MODES=[{id:'flash',icon:'🪄',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'🧩',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'⌨️',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'✍️',title:'Sentence building',desc:'Translate the sentence into English'}];
+const MODES=[{id:'flash',icon:'',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'',title:'Sentence building',desc:'Translate the sentence into English'}];
 let page='home',task=null,modalResolve=null,flash=null,match=null,write=null,sentence=null,translator={sl:'en',tl:window.engNativeCode(),result:'',examples:[]},matchState=null;
 const sentenceAiPending=new Set(),sentenceAiError=new Set();
 function progressFor(k=today()){if(!S.progress[k])S.progress[k]={words:S.words.filter(w=>due(w)).map(w=>w.id),modes:{},tasks:{},score:0};const p=S.progress[k];p.modes=p.modes||{};p.tasks=p.tasks||{};if(!Array.isArray(p.words))p.words=[];return p}
@@ -265,7 +265,7 @@ function vibrate(pattern=25){if(S.set.vib&&navigator.vibrate)navigator.vibrate(p
 function haptic(ok=true){sound(ok);vibrate(ok?22:[35,30,35])}
 function modal(title,body,buttons=[{text:'Close',value:false}]){return new Promise(resolve=>{modalResolve=resolve;$('#modal-root').innerHTML=`<div class="modal-back" role="presentation"><section class="modal" role="dialog" aria-modal="true"><h3>${title}</h3>${body}<div class="modal-actions">${buttons.map((b,i)=>`<button class="btn ${b.primary?'primary':'ghost'}" data-modal="${i}">${esc(b.text)}</button>`).join('')}</div></section></div>`;$('#modal-root').querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>{const v=buttons[+b.dataset.modal].value;$('#modal-root').innerHTML='';resolve(v)});$('#modal-root').querySelector('.modal-back').addEventListener('click',e=>{if(e.target.classList.contains('modal-back')){ $('#modal-root').innerHTML='';resolve(false)}})})}
 
-function applyTheme(theme){const next=theme==='day'?'day':'night';document.body.dataset.theme=next;try{localStorage.setItem('english-soz-theme',next)}catch{}const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=next==='day'?'#70c5ff':'#0a1930';const b=$('.theme-toggle');if(b){b.innerHTML=next==='day'?'🌙 <span>Tungi</span>':'☀️ <span>Kunduzgi</span>';b.setAttribute('aria-label',next==='day'?'Tungi rejimga o‘tish':'Kunduzgi rejimga o‘tish');b.title=b.getAttribute('aria-label')}}
+function applyTheme(theme){const next=theme==='day'?'day':'night';document.body.dataset.theme=next;try{localStorage.setItem('english-soz-theme',next)}catch{}const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=next==='day'?'#70c5ff':'#0a1930';const b=$('.theme-toggle');if(b){b.innerHTML=next==='day'?'<span>Tungi</span>':'<span>Kunduzgi</span>';b.setAttribute('aria-label',next==='day'?'Tungi rejimga o‘tish':'Kunduzgi rejimga o‘tish');b.title=b.getAttribute('aria-label')}}
 function toggleTheme(){const next=document.body.dataset.theme==='day'?'night':'day';document.querySelector('.celestial-transition')?.remove();document.body.classList.remove('theme-animating');applyTheme(next)}
 function ensureThemeToggle(){const top=$('.top');if(page!=='home'){document.querySelectorAll('.theme-toggle').forEach(b=>b.remove());return}if(!top)return;document.querySelectorAll('.theme-toggle').forEach(b=>{if(!top.contains(b))b.remove()});let b=top.querySelector('.theme-toggle');if(!b){b=document.createElement('button');b.type='button';b.className='theme-toggle';b.onclick=toggleTheme;top.appendChild(b)}applyTheme(document.body.dataset.theme||(()=>{try{return localStorage.getItem('english-soz-theme')||'night'}catch{return'night'}})())}
 
@@ -274,10 +274,13 @@ function go(p){page=p;task=null;render();window.scrollTo({top:0,behavior:'smooth
 function header(title,sub=''){return `<div class="screen-title"><div><div class="eyebrow">ENGLISH SO‘Z / ${page==='home'?'OVERVIEW':page.toUpperCase()}</div><h2>${title}</h2><p class="subhead">${sub}</p></div></div>`}
 function bar(pct){return `<div class="bar ${pct===0?'zero':''}"><i style="width:${Math.max(0,Math.min(100,pct))}%"></i></div>`}
 function percentToday(){const p=progressFor();return Math.round(MODES.reduce((sum,m)=>sum+(Number(p.modes[m.id]?.score)||0),0)/4)}
+function streakFlameIcon(){return '<svg class="streak-flame" viewBox="0 0 32 38" aria-hidden="true"><path d="M17 2c1 8-5 10-3 16 1-3 4-4 6-8 7 7 9 13 6 20-2 5-6 7-11 7C7 37 2 31 3 23 4 16 10 11 11 6c3 3 4 6 4 9 3-4 3-8 2-13Z" fill="#FF9A55"/><path d="M17 20c1 4-3 5-2 9 1-2 3-2 4-5 3 4 4 7 2 10-1 2-3 3-5 3-4 0-6-3-5-7 0-3 3-6 4-8 1 1 1 2 2 3Z" fill="#FFE19A"/></svg>'}
+function libraryIcon(){return '<svg viewBox="0 0 28 28" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 5h5v18H5zM12 4h5v19h-5zM19 7h4v16h-4z"/><path d="M4 24h20"/></svg>'}
+function reviewIcon(){return '<svg viewBox="0 0 28 28" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h17l-4-4M23 8l-4 4M23 20H6l4 4M5 20l4-4"/></svg>'}
 function streak(){let d=new Date(today()),n=0;const has=()=>{const p=S.progress[dateKey(d)];return p&&Object.keys(p.modes||{}).length>0};if(!has())d.setDate(d.getDate()-1);while(has()&&n<400){n++;d.setDate(d.getDate()-1)}return n}
 function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function home(){const p=progressFor(),pct=percentToday(),done=Object.keys(p.modes).length,dues=dueWords();return `${header('Improve every day','Small steps lead to big results.')}
-<div class="panel"><div class="progress-head"><span>Today's tasks:</span><span class="percent">${pct}%</span></div><div class="subhead" style="margin-top:4px">${done}/4 tasks completed${done===4?' · Excellent! 🏆':''}</div>${bar(pct)}<div class="row spread" style="margin-top:13px"><small>${new Date().toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long'})}</small><span class="badge">${done===4?'Day completed':'Keep going'}</span></div></div>
+<div class="panel"><div class="progress-head"><span>Today's tasks:</span><span class="percent">${pct}%</span></div><div class="subhead" style="margin-top:4px">${done}/4 tasks completed${done===4?' · Excellent!':''}</div>${bar(pct)}<div class="row spread" style="margin-top:13px"><small>${new Date().toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long'})}</small><span class="badge">${done===4?'Day completed':'Keep going'}</span></div></div>
 <div class="panel"><div class="quick"><button onclick="openCalendar()"><span class="qicon">🔥</span><span class="qnum">${streak()}</span><span class="qlabel">Daily streak</span></button><button onclick="openWordList()"><span class="qicon">📚</span><span class="qnum">${S.words.length}</span><span class="qlabel">Word list</span></button><button onclick="go('translator')"><span class="qicon">⌕</span><span class="qnum">Translator</span><span class="qlabel">Add a word</span></button><button onclick="openTodayWords()"><span class="qicon">🔔</span><span class="qnum">${dues.length}</span><span class="qlabel">Words due today</span></button></div></div>
 <div class="home-grid"><section class="panel"><div class="row spread"><div><div class="eyebrow">PROGRESS HISTORY</div><h3 class="section-title" style="margin-top:5px">Practice activity</h3></div><span class="badge" id="chart-range">7 days</span></div><div class="chart-controls"><button class="btn ghost small" onclick="shiftChart(-1)" aria-label="One day earlier">←</button><span class="subhead" id="chart-caption">Last 7 days</span><button class="btn ghost small" onclick="shiftChart(1)" aria-label="One day later">→</button></div><div class="chart-wrap">${chart()}</div><p class="chart-tip" id="chart-tip">Tap a point or hover over it. You can also swipe the chart.</p></section><section class="panel"><div class="eyebrow">TODAY PLAN</div><h3 class="section-title" style="margin-top:5px">Continue learning</h3><div class="task-list" style="grid-template-columns:1fr">${MODES.map(m=>`<div class="task-card" onclick="startTask('${m.id}')"><div class="task-icon">${m.icon}</div><div class="task-copy"><b>${m.title}</b><small>${m.desc}</small><span class="task-state ${p.modes[m.id]?'done':''}">${p.modes[m.id]?'✓ Completed':'Start'}</span></div><span class="task-right">›</span></div>`).join('')}</div></section></div>`}
 let chartWindowOffset=0;
@@ -471,7 +474,7 @@ function matchPick(side,id){const m=match;if(!m||!m.pairs.length)return;if((side
 function writeView(){const w=write.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;return `${taskHeader('write',write.index,write.all.length)}<section class="panel">${wordStatusBadge(w)}<div class="eyebrow">WRITING</div><div class="flash-word" style="font-size:30px">${esc(w.translation)}</div><form onsubmit="event.preventDefault();checkWrite()"><label class="field-label" for="answer">Type the English word</label><div class="answerline"><input id="answer" class="field" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the English word" value=""/><button class="btn primary" type="submit">Check answer</button></div></form><div id="feedback" style="margin-top:14px">${write.feedback?`<p>${esc(write.feedback)}</p>`:''}</div></section>`}
 function checkWrite(){const input=$('#answer'),val=input?.value.trim();if(!val)return toast('Enter your answer.');const w=write.items.shift(),ok=norm(val)===norm(w.word);if(ok){weightedCorrect('write',w.id);write.correct++;write.miss.delete(w.id);write.feedback=`✓ Correct: ${w.word}`}else{weightedWrong('write',w.id);write.miss.add(w.id);write.items.push(w);write.feedback=`Incorrect. Correct answer: ${w.word} — this word will appear again.`}write.index++;haptic(ok);if(!write.items.length){finishTask('write',write.correct,write.all.length,write.miss);return}render()}
 function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’‘`]/g,"'").replace(/[^\p{L}\p{N}' ]/gu,' ').replace(/\s+/g,' ').trim()}
-function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz||w.examples?.nativeLanguage!==window.engNativeCode()){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${wordStatusBadge(w)}<div class="eyebrow">SENTENCE BUILDING · AI</div><h3 class="section-title">${loading?'Preparing a sentence…':failed?'Could not prepare the sentence':'AI is preparing a sentence'}</h3><p class="subhead">${loading?'AI is preparing a sentence in your native language and its English translation.':failed?('AI error: '+esc(aiLastError||'Check your API key, internet connection, or API limit.')):'No saved example is available. AI will generate a new one.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Try again</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profile and API key</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Please wait a moment.':'A new sentence is being generated for this word.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${wordStatusBadge(w)}<div class="eyebrow">GAP TUZISH · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Target word: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Check answer</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
+function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz||w.examples?.nativeLanguage!==window.engNativeCode()){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${wordStatusBadge(w)}<div class="eyebrow">SENTENCE BUILDING · AI</div><h3 class="section-title">${loading?'Preparing a sentence…':failed?'Could not prepare the sentence':'AI is preparing a sentence'}</h3><p class="subhead">${loading?'AI is preparing a sentence in your native language and its English translation.':failed?('AI error: '+esc(aiLastError||'Check your API key, internet connection, or API limit.')):'No saved example is available. AI will generate a new one.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Try again</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profile and API key</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Please wait a moment.':'A new sentence is being generated for this word.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${wordStatusBadge(w)}<div class="eyebrow">MAKING SENTENCES · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Target word: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Check answer</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
 async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Unknown AI error';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
 function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
 async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'){
@@ -557,7 +560,7 @@ function finishTask(id,correct,total,miss=new Set()){
  const history=S.history[today()]||{},oldHistory=history[id];history[id]=id==='write'&&oldHistory&&Number(oldHistory.score)>score?oldHistory:{score:id==='write'?best.score:score,correct:id==='write'?best.correct:correct,total:id==='write'?best.total:total,passed:score>=70||(id==='write'&&Number(best.score)>=70)};S.history[today()]=history;save();task=null;page='result';
  matchState={id,correct:id==='write'?best.correct:correct,total:id==='write'?best.total:total,score:id==='write'?best.score:score,miss:[...missed],passed:score>=70||(id==='write'&&Number(best.score)>=70)};render()
 }
-function resultView(){const r=matchState||{score:0,correct:0,total:0,id:'flash'};const passed=r.score>=70;return `${header(passed?'Practice completed':'Below 70%',passed?'This task is complete.':'The task is not complete yet. Try again.')}<section class="panel task-area"><div class="ring" style="--pct:${r.score}"><b>${r.score}%</b></div><h2 style="margin:8px 0">${passed?(r.score>=90?'Excellent result! 🚀':'Good work! 💪'):'Keep practicing 💪'}</h2><p class="subhead">${r.correct} correct · ${Math.max(0,r.total-r.correct)} incorrect · ${r.total} questions</p><p class="subhead">${passed?'✓ Today’s task completed.':'You need at least 70%. This attempt was not counted as a completed daily task.'}</p><div style="margin-top:20px" class="stack"><button class="btn primary full" onclick="startTask('${r.id}')">${passed?'Practice again':'Try again'}</button><button class="btn secondary full" onclick="go('tasks')">Another task</button><button class="btn ghost full" onclick="go('home')">Back to Home</button></div></section>`}
+function resultView(){const r=matchState||{score:0,correct:0,total:0,id:'flash'};const passed=r.score>=70;return `${header(passed?'Practice completed':'Below 70%',passed?'This task is complete.':'The task is not complete yet. Try again.')}<section class="panel task-area"><div class="ring" style="--pct:${r.score}"><b>${r.score}%</b></div><h2 style="margin:8px 0">${passed?(r.score>=90?'Excellent result!':'Good work!'):'Keep practicing'}</h2><p class="subhead">${r.correct} correct · ${Math.max(0,r.total-r.correct)} incorrect · ${r.total} questions</p><p class="subhead">${passed?'✓ Today’s task completed.':'You need at least 70%. This attempt was not counted as a completed daily task.'}</p><div style="margin-top:20px" class="stack"><button class="btn primary full" onclick="startTask('${r.id}')">${passed?'Practice again':'Try again'}</button><button class="btn secondary full" onclick="go('tasks')">Another task</button><button class="btn ghost full" onclick="go('home')">Back to Home</button></div></section>`}
 const oldRender=render;render=function(){if(page==='result'){nav();$('#app').innerHTML=`<div class="top"><div class="brand"><div class="logo">✦</div><div><h1>Engliwords</h1><p>Your results</p></div></div></div>${resultView()}`;return}oldRender()};
 function openWordList(){const list=[...S.words].sort((a,b)=>a.translation.localeCompare(b.translation,'en'));const body=list.length?'<p class="subhead">Total '+list.length+' words. Use the 🗑 button to remove a word.</p><div style="max-height:55vh;overflow:auto">'+list.map((w,i)=>'<div class="list-item"><div style="min-width:0;flex:1"><b>'+(i+1)+'. '+esc(w.translation)+'</b><small>'+esc(w.added||'')+'</small></div><span class="badge">'+((w.done||[]).length?'Reviewed':'New')+'</span><button class="btn danger small" style="margin-left:8px" onclick="deleteWord(&quot;'+esc(w.id)+'&quot;)" aria-label="Delete word">🗑</button></div>').join('')+'</div>':'<p class="subhead">No words have been added yet.</p>';modal('Word list',body)}
 async function deleteWord(id){const w=S.words.find(x=>x.id===id);if(!w)return;const ok=await modal('Delete word','<p class="subhead">“'+esc(w.word)+' — '+esc(w.translation)+'” be permanently removed from your vocabulary?</p>',[{text:'Cancel',value:false},{text:'Delete',value:true,primary:true}]);if(!ok)return;S.words=S.words.filter(x=>x.id!==id);for(const p of Object.values(S.progress||{})){if(Array.isArray(p.words))p.words=p.words.filter(x=>x!==id)}save();render();toast('Word deleted.');openWordList()}
@@ -617,14 +620,14 @@ body.pg-home .app .panel{margin-bottom:0}
 `;
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 
-applyTheme=function(theme){const n=theme==='day'?'day':'night';document.body.dataset.theme=n;try{localStorage.setItem('english-soz-theme',n)}catch{}const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=n==='day'?'#70c5ff':'#0a1930';document.querySelectorAll('.theme-toggle').forEach(b=>{b.innerHTML=n==='day'?'☀️ <span>Day</span>':'🌙 <span>Night</span>'})};
+applyTheme=function(theme){const n=theme==='day'?'day':'night';document.body.dataset.theme=n;try{localStorage.setItem('english-soz-theme',n)}catch{}const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=n==='day'?'#70c5ff':'#0a1930';document.querySelectorAll('.theme-toggle').forEach(b=>{b.innerHTML=n==='day'?'<span>Day</span>':'<span>Night</span>'})};
 ensureThemeToggle=function(){if(page!=='home')document.querySelectorAll('.theme-toggle').forEach(b=>b.remove());applyTheme(document.body.dataset.theme||'night')};
 
 /* 1-6: asosiy oyna */
 home=function(){
  const p=progressFor(),done=Object.keys(p.modes).length,pct=percentToday(),n=streak();
  const dying=n>0&&done<4&&new Date().getHours()>=18;
- return `<div class="top2"><h1 class="bigbrand">Engliwords</h1><div class="topr"><button type="button" class="streak ${dying?'dying':''}" onclick="openCalendar()" aria-label="Daily streak"><b>${n}</b><span class="flame">🔥</span></button><button type="button" class="theme-toggle" onclick="toggleTheme()"></button></div></div>
+ return `<div class="top2"><h1 class="bigbrand">Engliwords</h1><div class="topr"><button type="button" class="streak ${dying?'dying':''}" onclick="openCalendar()" aria-label="Daily streak"><b>${n}</b><span class="flame"><svg class="streak-flame" viewBox="0 0 32 38" aria-hidden="true"><path d="M17 2c1 8-5 10-3 16 1-3 4-4 6-8 7 7 9 13 6 20-2 5-6 7-11 7C7 37 2 31 3 23 4 16 10 11 11 6c3 3 4 6 4 9 3-4 3-8 2-13Z" fill="#FF9A55"/><path d="M17 20c1 4-3 5-2 9 1-2 3-2 4-5 3 4 4 7 2 10-1 2-3 3-5 3-4 0-6-3-5-7 0-3 3-6 4-8 1 1 1 2 2 3Z" fill="#FFE19A"/></svg></span></button><button type="button" class="theme-toggle" onclick="toggleTheme()"></button></div></div>
 <div class="panel hp-today"><div class="tl"><b class="bigt">Today:</b><span class="subhead">${done}/4 tasks completed</span><button class="btn primary small" onclick="go('tasks')">Keep going</button></div><div class="barrow">${bar(pct)}<span class="percent">${pct}%</span></div></div>
 <div class="panel addrow"><span>Add a word</span><button type="button" class="plus" onclick="go('add')" aria-label="Add a word">+</button></div>
 <section class="panel hp-prog"><h3 class="section-title">progress</h3><div class="chart-wrap">${chart()}</div><div class="hp-stats"><b>Words: ${S.words.length}</b><b>Today: ${dueWords().length}</b></div></section>`};
@@ -1198,14 +1201,42 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     return words;
   }
   function wordStatusBadge(w){const status=wordStatus(w);return '<span class="badge word-status-badge status-'+status+'">'+statusText[status]+'</span>'}
-  function groupCards(){
-    const flow=progressFor().groupFlow;
-    const hasFlow=flow&&Array.isArray(flow.wordIds)&&flow.wordIds.length;
-    const resume=hasFlow?'<button class="group-task-card resume-task-card" data-task-group="'+flow.group+'" onclick="startGroupTaskFromButton(this)"><b>Continue practice</b><small>'+flow.wordIds.length+' words · '+(flow.group==='mixed'?'Mixed words':'Previous practice')+'</small></button>':'';
-    const available=S.words.some(w=>due(w));
-    const mixed=available?'<button class="group-task-card" data-task-group="mixed" onclick="startGroupTaskFromButton(this)"><b>Mixed practice</b><small>New, learning and ready-to-use words</small></button>':'';
-    return '<div class="group-task-list">'+resume+mixed+'</div>';
+  const exerciseStages=[
+    {id:'flash',title:'Flashcards',desc:'Recall the meaning'},
+    {id:'match',title:'Matching',desc:'Match words and meanings'},
+    {id:'write',title:'Writing',desc:'Write the English word'},
+    {id:'sentence',title:'Making sentences',desc:'Build a complete sentence'}
+  ];
+  function exerciseIcon(id){
+    const common='viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"';
+    if(id==='flash')return '<svg '+common+'><rect x="12" y="15" width="31" height="39" rx="7" stroke="currentColor" stroke-width="2.8"/><rect x="22" y="9" width="31" height="39" rx="7" fill="url(#exg)" stroke="currentColor" stroke-width="2.8"/><path d="M31 26h13M31 33h9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="m49 8 2.5-5L54 8l5 2.5-5 2.5-2.5 5-2.5-5-5-2.5L49 8Z" fill="#FFE29A"/><defs><linearGradient id="exg" x1="22" y1="9" x2="54" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#78EBD9"/><stop offset="1" stop-color="#8FA8FF"/></linearGradient></defs></svg>';
+    if(id==='match')return '<svg '+common+'><rect x="7" y="11" width="20" height="13" rx="6.5" stroke="currentColor" stroke-width="2.8"/><rect x="37" y="40" width="20" height="13" rx="6.5" stroke="currentColor" stroke-width="2.8"/><rect x="7" y="40" width="20" height="13" rx="6.5" stroke="currentColor" stroke-width="2.8"/><rect x="37" y="11" width="20" height="13" rx="6.5" stroke="currentColor" stroke-width="2.8"/><path d="M27 17.5h5a7 7 0 0 1 7 7v15M37 46.5h-5a7 7 0 0 1-7-7v-15" stroke="#77E6D5" stroke-width="3" stroke-linecap="round"/></svg>';
+    if(id==='write')return '<svg '+common+'><path d="m15 43 2.8-10.8L42.5 7.5a6 6 0 0 1 8.5 8.5L26.3 40.7 15 43Z" fill="url(#exw)" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"/><path d="m34 16 14 14M13 51h39" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><defs><linearGradient id="exw" x1="16" y1="10" x2="50" y2="45" gradientUnits="userSpaceOnUse"><stop stop-color="#8FA8FF"/><stop offset="1" stop-color="#78EBD9"/></linearGradient></defs></svg>';
+    return '<svg '+common+'><path d="M8 13a7 7 0 0 1 7-7h34a7 7 0 0 1 7 7v19a7 7 0 0 1-7 7H29l-12 9v-9h-2a7 7 0 0 1-7-7V13Z" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"/><path d="M18 18h28M18 26h20" stroke="#78EBD9" stroke-width="3" stroke-linecap="round"/><path d="m35 48 4-1 13-13-3-3-13 13-1 4Z" fill="#8FA8FF" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
   }
+  function exerciseTiles(){
+    const p=progressFor(),flow=p.groupFlow,results=flow?.results||{};
+    const passed=id=>Number(p.modes[id]?.score)>=70||Number(results[id]?.score)>=70;
+    let current=flow&&Array.isArray(flow.wordIds)&&flow.wordIds.length?Math.max(0,Math.min(3,Number(flow.index)||0)):exerciseStages.findIndex(x=>!passed(x.id));
+    if(current<0)current=4;
+    return '<div class="exercise-grid">'+exerciseStages.map((stage,index)=>{
+      const complete=passed(stage.id),locked=index>current&&!complete,available=index===current;
+      const state=complete?'<span class="exercise-state complete">Completed</span>':available?'<span class="exercise-state current">Start here</span>':'<span class="exercise-state locked"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="8" width="12" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>Locked</span>';
+      return '<div class="exercise-tile '+(available?'is-current ':'')+(locked?'is-locked ':'')+(complete?'is-complete':'')+'" role="button" tabindex="0" aria-disabled="'+(locked||complete)+'" onclick="openExerciseStage('+index+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openExerciseStage('+index+')}"><span class="exercise-art">'+exerciseIcon(stage.id)+'</span><span class="exercise-copy"><b>'+stage.title+'</b><small>'+stage.desc+'</small>'+state+'</span></div>';
+    }).join('')+'</div>';
+  }
+  function groupCards(){return exerciseTiles()}
+  window.openExerciseStage=function(index){
+    const p=progressFor(),flow=p.groupFlow,results=flow?.results||{};
+    const passed=id=>Number(p.modes[id]?.score)>=70||Number(results[id]?.score)>=70;
+    let current=flow&&Array.isArray(flow.wordIds)&&flow.wordIds.length?Math.max(0,Math.min(3,Number(flow.index)||0)):exerciseStages.findIndex(x=>!passed(x.id));
+    if(current<0)current=4;
+    if(index>current){toast('Complete the previous exercises first.');return}
+    if(index<current){toast('This exercise has already been completed.');return}
+    if(index>3||current===4){toast('All four exercises are complete.');return}
+    if(!flow||!Array.isArray(flow.wordIds)||!flow.wordIds.length)window.startGroupTask('mixed',index);
+    else window.startGroupTask(flow.group||'mixed',index);
+  };
   function allResultsWords(){return ['new','learning','ready'].flatMap(status=>wordsForStatus(status))}
   function resultListHTML(){
     const q=resultFilter.trim().toLocaleLowerCase();
@@ -1240,10 +1271,8 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     return '<div class="tasks-empty-screen"><div class="tasks-empty-celebration"><div class="tasks-empty-message">Great job! No tasks left.</div></div><div class="tasks-fullscreen-fireworks" aria-hidden="true">'+flashes+particles+'</div></div>';
   }
   tasksPage=function(){
-    const cards=groupCards();
-    if(cards.includes('group-task-card')){emptyCelebrationActive=false;return '<div class="panel task-screen">'+cards+'</div>'}
-    if(!emptyCelebrationActive)emptyCelebrationActive=true;
-    return emptyTaskCelebration();
+    emptyCelebrationActive=false;
+    return '<div class="panel task-screen">'+exerciseTiles()+'</div>';
   };
   function resultRow(w){
     const status=wordStatus(w),avg=wordAverage(w);
@@ -1294,9 +1323,9 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     }
     originalStartTask(id);
   };
-  const modeLabels={flash:'Flashcards',match:'Matching',write:'Write the English word',sentence:'Sentence translation'};
+  const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Making sentences'};
   function setTaskTransition(id){taskTransitionLabel=modeLabels[id]||''}
-  window.startGroupTask=function(group){
+  window.startGroupTask=function(group,requestedIndex=0){
     const p=progressFor(),saved=p.groupFlow;
     if(saved&&saved.group!==group){toast('Finish your current task first.');return}
     if(saved&&saved.group===group&&Array.isArray(saved.wordIds)&&saved.wordIds.length){
@@ -1306,8 +1335,11 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     }
     if(!activeTaskWords){
       const words=group==='mixed'?dueMixedWords():dueWordsForStatus(group);if(!words.length){toast('No words are available for practice today.');return}
-      activeGroup=group;activeTaskWords=words;taskFlowIndex=0;
-      p.groupFlow={group,wordIds:words.map(w=>w.id),index:0,startedAt:Date.now()};save();
+      const ordered=['flash','match','write','sentence'];
+      const startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0)),priorResults={};
+      ordered.slice(0,startAt).forEach(mode=>{const prior=p.modes[mode];if(prior&&Number(prior.score)>=70)priorResults[mode]={...prior,passed:true}});
+      activeGroup=group;activeTaskWords=words;taskFlowIndex=startAt;
+      p.groupFlow={group,wordIds:words.map(w=>w.id),index:startAt,results:priorResults,startedAt:Date.now()};save();
     }
     const current=['flash','match','write','sentence'][taskFlowIndex];
     setTaskTransition(current);
@@ -1534,4 +1566,34 @@ body[data-theme="day"] .bottom-nav button.active{
 .word-status-badge{display:inline-block;margin:0 0 8px}
 .choice small{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
 </style>
-</body></html>
+<style id="engliwords-exercise-stage-design">
+.exercise-grid{display:grid;grid-template-columns:1fr;gap:13px;padding:4px 0}
+.exercise-tile{position:relative;display:flex;align-items:center;gap:17px;min-height:112px;padding:17px 16px;border:1px solid rgba(154,205,231,.22);border-radius:22px;background:linear-gradient(120deg,rgba(23,47,72,.68),rgba(30,45,78,.55));overflow:hidden;cursor:pointer;transition:transform .2s,border-color .2s,background .2s;outline:none}
+.exercise-tile::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 12% 10%,rgba(117,229,210,.13),transparent 52%)}
+.exercise-tile.is-current{border-color:rgba(117,229,210,.62);box-shadow:0 0 0 1px rgba(117,229,210,.12),0 10px 28px rgba(0,0,0,.13)}
+.exercise-tile.is-current:active{transform:scale(.985)}
+.exercise-tile.is-locked{cursor:not-allowed}
+.exercise-tile.is-locked .exercise-art,.exercise-tile.is-locked .exercise-copy{filter:blur(2.2px);opacity:.34}
+.exercise-tile.is-complete{border-color:rgba(114,226,174,.35)}
+.exercise-art{position:relative;z-index:1;flex:0 0 66px;width:66px;height:66px;display:grid;place-items:center;border-radius:20px;background:linear-gradient(145deg,rgba(117,229,210,.18),rgba(138,168,255,.16));color:#aaf4e8}
+.exercise-art svg{width:48px;height:48px;overflow:visible}
+.exercise-copy{position:relative;z-index:1;display:grid;gap:4px;min-width:0}
+.exercise-copy b{font-size:19px;letter-spacing:-.35px;color:var(--text)}
+.exercise-copy small{font-size:12px;color:var(--muted)}
+.exercise-state{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;font-weight:750;letter-spacing:.25px}
+.exercise-state svg{width:16px;height:16px}
+.exercise-state.current{color:#8debd9}
+.exercise-state.locked{color:#9aa9bd}
+.exercise-state.complete{color:#79e6b3}
+.exercise-state.complete::before{content:"✓";display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:rgba(114,226,174,.15)}
+.exercise-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+body[data-theme="day"] .exercise-tile{background:linear-gradient(120deg,rgba(255,255,255,.88),rgba(231,244,255,.84));border-color:#c6dce9}
+body[data-theme="day"] .exercise-copy b{color:#18344d}
+body[data-theme="day"] .exercise-copy small{color:#60768c}
+body[data-theme="day"] .exercise-art{color:#276b82;background:linear-gradient(145deg,#d8f7ef,#e2eaff)}
+body[data-theme="day"] .exercise-state.locked{color:#8a9aaa}
+.streak-flame{width:25px;height:29px;vertical-align:middle;filter:drop-shadow(0 0 7px rgba(255,154,92,.25))}
+.flame{display:inline-flex;align-items:center;justify-content:center}
+.flame svg{width:26px;height:30px}
+@media(min-width:600px){.exercise-grid{grid-template-columns:1fr 1fr}.exercise-tile{min-height:128px}}
+</style></body></html>
