@@ -1221,8 +1221,9 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     if(current<0)current=4;
     return '<div class="exercise-grid">'+exerciseStages.map((stage,index)=>{
       const complete=passed(stage.id),locked=index>current&&!complete,available=index===current;
-      const state=complete?'<span class="exercise-state complete">Completed</span>':available?'<span class="exercise-state current">Start here</span>':'<span class="exercise-state locked"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="8" width="12" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>Locked</span>';
-      return '<div class="exercise-tile '+(available?'is-current ':'')+(locked?'is-locked ':'')+(complete?'is-complete':'')+'" role="button" tabindex="0" aria-disabled="'+(locked||complete)+'" onclick="openExerciseStage('+index+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openExerciseStage('+index+')}"><span class="exercise-art">'+exerciseIcon(stage.id)+'</span><span class="exercise-copy"><b>'+stage.title+'</b><small>'+stage.desc+'</small>'+state+'</span></div>';
+      const state=complete?'<span class="exercise-state complete">Completed</span>':available?'<span class="exercise-state current">Start here</span>':'<span class="exercise-state locked">Locked</span>';
+      const lockIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+      return '<div class="exercise-tile '+(available?'is-current ':'')+(locked?'is-locked ':'')+(complete?'is-complete':'')+'" role="button" tabindex="0" aria-disabled="'+(locked||complete)+'" onclick="openExerciseStage('+index+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openExerciseStage('+index+')}"><span class="exercise-art '+(locked?'is-lock':'')+'">'+(locked?lockIcon:exerciseIcon(stage.id))+'</span><span class="exercise-copy"><b>'+stage.title+'</b><small>'+stage.desc+'</small>'+state+'</span></div>';
     }).join('')+'</div>';
   }
   function groupCards(){return exerciseTiles()}
@@ -1331,10 +1332,19 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     if(saved&&saved.group===group&&Array.isArray(saved.wordIds)&&saved.wordIds.length){
       const ids=new Set(saved.wordIds.map(String)),words=S.words.filter(w=>ids.has(String(w.id)));
       if(words.length){activeGroup=group;activeTaskWords=words;taskFlowIndex=Math.max(0,Math.min(3,Number(saved.index)||0))}
-      else {delete p.groupFlow;save()}
+      else {delete p.groupFlow;activeGroup=null;activeTaskWords=null;save()}
+    }else{
+      activeGroup=null;activeTaskWords=null;
     }
     if(!activeTaskWords){
-      const words=group==='mixed'?dueMixedWords():dueWordsForStatus(group);if(!words.length){toast('No words are available for practice today.');return}
+      let words=group==='mixed'?dueMixedWords():dueWordsForStatus(group);
+      if(!words.length){
+        const savedIds=new Set(p.words||[]);
+        words=S.words.filter(w=>savedIds.has(String(w.id)));
+      }
+      if(!words.length)words=group==='mixed'?[...S.words]:wordsForStatus(group);
+      if(!words.length){toast('Add words to your vocabulary before starting practice.');return}
+      for(let i=words.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[words[i],words[j]]=[words[j],words[i]]}
       const ordered=['flash','match','write','sentence'];
       const startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0)),priorResults={};
       ordered.slice(0,startAt).forEach(mode=>{const prior=p.modes[mode];if(prior&&Number(prior.score)>=70)priorResults[mode]={...prior,passed:true}});
@@ -1572,8 +1582,11 @@ body[data-theme="day"] .bottom-nav button.active{
 .exercise-tile::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 12% 10%,rgba(117,229,210,.13),transparent 52%)}
 .exercise-tile.is-current{border-color:rgba(117,229,210,.62);box-shadow:0 0 0 1px rgba(117,229,210,.12),0 10px 28px rgba(0,0,0,.13)}
 .exercise-tile.is-current:active{transform:scale(.985)}
-.exercise-tile.is-locked{cursor:not-allowed}
-.exercise-tile.is-locked .exercise-art,.exercise-tile.is-locked .exercise-copy{filter:blur(2.2px);opacity:.34}
+.exercise-tile.is-locked{cursor:not-allowed;background:transparent!important;border:0!important;box-shadow:none!important;padding-left:0;padding-right:0}
+.exercise-tile.is-locked::after{display:none}
+.exercise-tile.is-locked .exercise-art{background:transparent;border:0;box-shadow:none;color:var(--muted)}
+.exercise-tile.is-locked .exercise-art.is-lock svg{width:27px;height:27px}
+.exercise-tile.is-locked .exercise-copy{filter:none;opacity:1}
 .exercise-tile.is-complete{border-color:rgba(114,226,174,.35)}
 .exercise-art{position:relative;z-index:1;flex:0 0 66px;width:66px;height:66px;display:grid;place-items:center;border-radius:20px;background:linear-gradient(145deg,rgba(117,229,210,.18),rgba(138,168,255,.16));color:#aaf4e8}
 .exercise-art svg{width:48px;height:48px;overflow:visible}
