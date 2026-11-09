@@ -216,7 +216,16 @@ async function cloudLogout() {
   }
 }
 
+// Supabase is the only account source now. cloud.js may have loaded an old
+// Google Drive nickname into memory before this file runs; never treat that
+// cached legacy profile as an authenticated Supabase session.
 try { localStorage.removeItem("eng-cloud-profile"); localStorage.removeItem("eng-cloud-linked"); } catch {}
+if (typeof cloud === "object") {
+  cloud.user = null;
+  cloud.ready = false;
+  cloud.token = null;
+}
+window.__sbProfile = null;
 
 // Remove all legacy local copies of vocabulary and progress.
 try {
