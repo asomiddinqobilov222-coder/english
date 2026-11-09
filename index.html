@@ -1472,7 +1472,7 @@ body[data-theme="day"] .bottom-nav button.active{
 
 <script id="engliwords-account-gates">
 (function(){
-  const signedIn=()=>Boolean(window.cloud&&cloud.ready&&cloud.user);
+  const signedIn=()=>Boolean(typeof cloud!=='undefined'&&cloud&&cloud.ready&&cloud.user);
   const originalGo=go;
   go=function(target){
     if(target==='add'&&!signedIn()){
