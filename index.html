@@ -1331,59 +1331,57 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   function setTaskTransition(id){taskTransitionLabel=modeLabels[id]||''}
   window.startGroupTask=function(group,requestedIndex=0){
     const p=progressFor();
-    let saved=p.groupFlow;
-    activeGroup=null;
-    activeTaskWords=null;
-    taskFlowIndex=0;
+    const saved=p.groupFlow;
+    let activeTaskWordsNext=null;
+    let startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0));
+    let priorResults={};
 
-    // Resume only a valid flow for this exact group. Discard stale legacy flows.
-    if(saved&&saved.group===group&&Array.isArray(saved.wordIds)&&saved.wordIds.length){
-      const ids=new Set(saved.wordIds.map(String));
-      const words=S.words.filter(w=>ids.has(String(w.id)));
+    // Reuse a saved session only while its word set still matches today's available words.
+    const candidates=group==='mixed'?dueMixedWords():dueWordsForStatus(group);
+    const fallback=candidates.length?candidates:[...S.words];
+    const candidateIds=new Set(fallback.map(w=>String(w.id)));
+    const savedIds=Array.isArray(saved?.wordIds)?saved.wordIds.map(String):[];
+    const savedSet=new Set(savedIds);
+    const sameWordSet=saved&&saved.group===group&&savedIds.length>0&&
+      savedIds.length===candidateIds.size&&savedIds.every(id=>candidateIds.has(id));
+
+    if(sameWordSet){
+      const words=S.words.filter(w=>savedSet.has(String(w.id)));
       if(words.length){
-        activeGroup=group;
-        activeTaskWords=words;
-        taskFlowIndex=Math.max(0,Math.min(3,Number(saved.index)||0));
-      }else{
-        delete p.groupFlow;
-        saved=null;
+        activeTaskWordsNext=words;
+        startAt=Math.max(0,Math.min(3,Number(saved.index)||0));
+        priorResults=saved.results||{};
       }
-    }else if(saved){
-      delete p.groupFlow;
-      saved=null;
     }
 
-    if(!activeTaskWords){
-      let words=group==='mixed'?dueMixedWords():dueWordsForStatus(group);
-      if(!words.length){
-        const savedIds=new Set(p.words||[]);
-        words=S.words.filter(w=>savedIds.has(String(w.id)));
-      }
-      if(!words.length)words=group==='mixed'?[...S.words]:wordsForStatus(group);
-      if(!words.length){
+    // New words were added (or the old flow is stale): restart from Flashcards
+    // with the full current word set so every stage uses the same words.
+    if(!activeTaskWordsNext){
+      activeTaskWordsNext=fallback;
+      if(!activeTaskWordsNext.length){
         toast('Add words to your vocabulary before starting practice.');
         return;
       }
-      for(let i=words.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));
-        [words[i],words[j]]=[words[j],words[i]];
-      }
-      const startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0));
-      const priorResults={};
-      const ordered=['flash','match','write','sentence'];
-      ordered.slice(0,startAt).forEach(mode=>{
-        const prior=p.modes[mode];
-        if(prior&&Number(prior.score)>=70)priorResults[mode]={...prior,passed:true};
-      });
-      activeGroup=group;
-      activeTaskWords=words;
-      taskFlowIndex=startAt;
-      p.groupFlow={group,wordIds:words.map(w=>w.id),index:startAt,results:priorResults,startedAt:Date.now()};
-      save();
+      startAt=0;
+      priorResults={};
+      p.groupFlow={
+        group,
+        wordIds:activeTaskWordsNext.map(w=>w.id),
+        index:0,
+        results:{},
+        startedAt:Date.now()
+      };
+    }else{
+      p.groupFlow={...saved,results:priorResults,index:startAt};
     }
 
+    activeGroup=group;
+    activeTaskWords=activeTaskWordsNext;
+    taskFlowIndex=startAt;
+    save();
+
     const current=['flash','match','write','sentence'][taskFlowIndex];
-    if(!current||!activeTaskWords||!activeTaskWords.length){
+    if(!current||!activeTaskWords.length){
       toast('Could not start this exercise. Please try again.');
       return;
     }
