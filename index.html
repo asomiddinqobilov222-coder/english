@@ -1327,15 +1327,29 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Making sentences'};
   function setTaskTransition(id){taskTransitionLabel=modeLabels[id]||''}
   window.startGroupTask=function(group,requestedIndex=0){
-    const p=progressFor(),saved=p.groupFlow;
-    if(saved&&saved.group!==group){toast('Finish your current task first.');return}
+    const p=progressFor();
+    let saved=p.groupFlow;
+    activeGroup=null;
+    activeTaskWords=null;
+    taskFlowIndex=0;
+
+    // Resume only a valid flow for this exact group. Discard stale legacy flows.
     if(saved&&saved.group===group&&Array.isArray(saved.wordIds)&&saved.wordIds.length){
-      const ids=new Set(saved.wordIds.map(String)),words=S.words.filter(w=>ids.has(String(w.id)));
-      if(words.length){activeGroup=group;activeTaskWords=words;taskFlowIndex=Math.max(0,Math.min(3,Number(saved.index)||0))}
-      else {delete p.groupFlow;activeGroup=null;activeTaskWords=null;save()}
-    }else{
-      activeGroup=null;activeTaskWords=null;
+      const ids=new Set(saved.wordIds.map(String));
+      const words=S.words.filter(w=>ids.has(String(w.id)));
+      if(words.length){
+        activeGroup=group;
+        activeTaskWords=words;
+        taskFlowIndex=Math.max(0,Math.min(3,Number(saved.index)||0));
+      }else{
+        delete p.groupFlow;
+        saved=null;
+      }
+    }else if(saved){
+      delete p.groupFlow;
+      saved=null;
     }
+
     if(!activeTaskWords){
       let words=group==='mixed'?dueMixedWords():dueWordsForStatus(group);
       if(!words.length){
@@ -1343,18 +1357,44 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
         words=S.words.filter(w=>savedIds.has(String(w.id)));
       }
       if(!words.length)words=group==='mixed'?[...S.words]:wordsForStatus(group);
-      if(!words.length){toast('Add words to your vocabulary before starting practice.');return}
-      for(let i=words.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[words[i],words[j]]=[words[j],words[i]]}
+      if(!words.length){
+        toast('Add words to your vocabulary before starting practice.');
+        return;
+      }
+      for(let i=words.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [words[i],words[j]]=[words[j],words[i]];
+      }
+      const startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0));
+      const priorResults={};
       const ordered=['flash','match','write','sentence'];
-      const startAt=Math.max(0,Math.min(3,Number(requestedIndex)||0)),priorResults={};
-      ordered.slice(0,startAt).forEach(mode=>{const prior=p.modes[mode];if(prior&&Number(prior.score)>=70)priorResults[mode]={...prior,passed:true}});
-      activeGroup=group;activeTaskWords=words;taskFlowIndex=startAt;
-      p.groupFlow={group,wordIds:words.map(w=>w.id),index:startAt,results:priorResults,startedAt:Date.now()};save();
+      ordered.slice(0,startAt).forEach(mode=>{
+        const prior=p.modes[mode];
+        if(prior&&Number(prior.score)>=70)priorResults[mode]={...prior,passed:true};
+      });
+      activeGroup=group;
+      activeTaskWords=words;
+      taskFlowIndex=startAt;
+      p.groupFlow={group,wordIds:words.map(w=>w.id),index:startAt,results:priorResults,startedAt:Date.now()};
+      save();
     }
+
     const current=['flash','match','write','sentence'][taskFlowIndex];
+    if(!current||!activeTaskWords||!activeTaskWords.length){
+      toast('Could not start this exercise. Please try again.');
+      return;
+    }
     setTaskTransition(current);
     startTask(current);
-    setTimeout(()=>{taskTransitionLabel='';if(page==='task')render()},850);
+    if(task!==current||page!=='task'){
+      task=current;
+      page='task';
+      render();
+    }
+    setTimeout(()=>{
+      taskTransitionLabel='';
+      if(page==='task')render();
+    },850);
   };
   taskView=function(){return (taskTransitionLabel?'<div class="task-transition"><div><strong>'+taskTransitionLabel+'</strong></div></div>':'')+originalTaskView()};
   finishTask=function(id,correct,total,miss){
