@@ -1272,8 +1272,9 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     try{
       window.startGroupTask(group,stageIndex);
     }catch(error){
-      console.error('Engliwords exercise launch failed:',error);
-      toast('Could not open '+(exerciseStages[stageIndex]?.title||'this exercise')+'. Please try again.');
+      console.error('Engliwords exercise launch failed:',error?.stack||error);
+      const detail=String(error?.message||error||'Unknown error').slice(0,110);
+      toast('Matching launch error: '+detail);
     }
   };
   function allResultsWords(){return ['new','learning','ready'].flatMap(status=>wordsForStatus(status))}
