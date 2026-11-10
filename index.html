@@ -495,9 +495,70 @@ function flashView(){const f=flash;if(!f||!f.items.length)return taskHeader('fla
 function flipFlashCard(){if(!flash)return;flash.revealed=!flash.revealed;const inner=$('.flashcard-inner');if(inner)inner.classList.toggle('is-flipped',flash.revealed);const actions=$('.flash-answer-actions');if(actions)actions.hidden=!flash.revealed;const hint=$('.flash-hint');if(hint)hint.textContent=flash.revealed?'Did you know the answer? Rate yourself.':'First javobni xotiradan topishga harakat qiling.';haptic(true)}
 function flashAnswer(ok){const f=flash,w=f.items.shift();if(ok){weightedCorrect('flash',w.id);f.correct++;f.miss.delete(w.id)}else{weightedWrong('flash',w.id);f.miss.add(w.id);f.items.push(w)}f.revealed=false;f.index++;haptic(ok);if(f.items.length===0){finishTask('flash',f.correct,f.all.length,f.miss);return}render()}
 function nextMatchBatch(){const m=match;if(m.pool.length===0){finishTask('match',m.correct,m.all.length,m.miss);return}m.pairs=m.pool.splice(0,Math.min(10,m.pool.length));m.left=[...m.pairs].sort(()=>Math.random()-.5);m.right=[...m.pairs].sort(()=>Math.random()-.5);m.selectedL=null;m.selectedR=null;m.usedL=new Set();m.usedR=new Set();m.statusL={};m.statusR={};m.solved=m.solved||new Set();m.failedL=new Set();m.wrongCount=0}
-function matchView(){const m=match;if(!m.pairs.length)nextMatchBatch();if(!m.pairs.length)return `<div class="panel">Ready!</div>`;return `${taskHeader('match',m.correct,m.all.length)}<section class="panel"><div class="eyebrow">MATCHING</div><h3 class="section-title" style="margin-top:5px">Find the matching translation</h3><p class="subhead" style="margin-bottom:15px">${m.pairs.length-m.usedR.size} translations left · incorrect English words cannot be selected again.</p><div class="match-columns"><div class="match-column" aria-label="English words">${m.left.map(w=>`<button class="choice ${m.selectedL===w.id?'selected':''} ${m.statusL[w.id]==='ok'?'correct':''} ${m.statusL[w.id]==='bad'?'wrong':''}" data-match-side="L" data-match-id="${esc(w.id)}" ${m.usedL.has(w.id)?'disabled':''} onclick="matchPick('L','${w.id}')">${esc(w.word)} <small>${statusText[wordStatus(w)]}</small></button>`).join('')}</div><div class="match-column" aria-label="Translations">${m.right.map(w=>`<button class="choice ${m.selectedR===w.id?'selected':''} ${m.statusR[w.id]==='ok'?'correct':''}" data-match-side="R" data-match-id="${esc(w.id)}" ${m.usedR.has(w.id)?'disabled':''} onclick="matchPick('R','${w.id}')">${esc(w.translation)}</button>`).join('')}</div></div></section>`}
+function matchView(){
+  const m=match;
+  if(!m||!Array.isArray(m.pairs))return '<div class="panel">Matching is not ready. Please reopen the task.</div>';
+  if(!m.pairs.length)nextMatchBatch();
+  if(!m.pairs.length)return '<div class="panel">Ready!</div>';
+  return `${taskHeader('match',m.correct,m.all.length)}<section class="panel"><div class="eyebrow">MATCHING</div><h3 class="section-title" style="margin-top:5px">Find the matching translation</h3><p class="subhead" style="margin-bottom:15px">${m.pairs.length-m.usedR.size} translations left · incorrect English words cannot be selected again.</p><div class="match-columns"><div class="match-column" aria-label="English words">${m.left.map(w=>{
+    const id=String(w.id);
+    const label=typeof window.engliwordsWordStatusLabel==='function'?window.engliwordsWordStatusLabel(w):'';
+    return `<button class="choice ${m.selectedL===id?'selected':''} ${m.statusL[id]==='ok'?'correct':''} ${m.statusL[id]==='bad'?'wrong':''}" data-match-side="L" data-match-id="${esc(id)}" ${m.usedL.has(id)?'disabled':''} onclick="matchPick('L','${esc(id)}')">${esc(w.word)} <small>${esc(label)}</small></button>`;
+  }).join('')}</div><div class="match-column" aria-label="Translations">${m.right.map(w=>{
+    const id=String(w.id);
+    return `<button class="choice ${m.selectedR===id?'selected':''} ${m.statusR[id]==='ok'?'correct':''}" data-match-side="R" data-match-id="${esc(id)}" ${m.usedR.has(id)?'disabled':''} onclick="matchPick('R','${esc(id)}')">${esc(w.translation)}</button>`;
+  }).join('')}</div></div></section>`;
+}
 function refreshMatchBoard(){const m=match;if(!m)return;const fresh=document.createElement('div');fresh.innerHTML=matchView();const next=fresh.querySelector('.match-columns'),current=$('.match-columns');if(next&&current){current.style.opacity='.35';current.style.transform='translateX(8px)';setTimeout(()=>{if(!current.isConnected)return;current.innerHTML=next.innerHTML;current.style.opacity='1';current.style.transform='translateX(0)';},75)}const p=$('.match-columns')?.previousElementSibling;if(p&&p.classList.contains('subhead'))p.textContent=(m.pairs.length-m.usedR.size)+' translations left · incorrect English words will not be selectable again.';const count=$('.task-count');if(count)count.textContent=Math.min(m.correct+1,m.all.length)+' / '+m.all.length}
-function matchPick(side,id){const m=match;if(!m||!m.pairs.length)return;if((side==='L'&&m.usedL.has(id))||(side==='R'&&m.usedR.has(id)))return;if(side==='L')m.selectedL=id;else m.selectedR=id;if(m.selectedL&&m.selectedR){const l=m.selectedL,r=m.selectedR;m.selectedL=null;m.selectedR=null;const leftBtn=document.querySelector('[data-match-side="L"][data-match-id="'+CSS.escape(l)+'"]');const rightBtn=document.querySelector('[data-match-side="R"][data-match-id="'+CSS.escape(r)+'"]');if(l===r){m.usedL.add(l);m.usedR.add(r);m.statusL[l]='ok';m.statusR[r]='ok';m.miss.delete(l);weightedCorrect('match',l);if(!m.solved.has(l)){m.solved.add(l);m.correct++}if(leftBtn){leftBtn.classList.remove('selected');leftBtn.classList.add('correct');leftBtn.disabled=true}if(rightBtn){rightBtn.classList.remove('selected');rightBtn.classList.add('correct');rightBtn.disabled=true}haptic(true)}else{m.usedL.add(l);m.failedL.add(l);m.statusL[l]='bad';m.statusR[r]='';m.miss.add(l);weightedWrong('match',l);m.pool.push(m.all.find(w=>w.id===l));m.wrongCount++;if(leftBtn){leftBtn.classList.remove('selected');leftBtn.classList.add('wrong');leftBtn.disabled=true}if(rightBtn){rightBtn.classList.remove('selected','wrong');rightBtn.disabled=false}haptic(false)}const done=m.usedR.size===m.pairs.length;if(done){setTimeout(()=>{nextMatchBatch();if(page==='task'&&task==='match'&&match.pairs.length)refreshMatchBoard();else render()},450)}else{const remainingL=m.left.some(w=>!m.usedL.has(w.id));if(!remainingL){setTimeout(()=>{nextMatchBatch();if(page==='task'&&task==='match'&&match.pairs.length)refreshMatchBoard();else render()},450)}}return}const picked=document.querySelector('[data-match-side="'+side+'"][data-match-id="'+CSS.escape(id)+'"]');if(picked){document.querySelectorAll('[data-match-side="'+side+'"].selected').forEach(el=>el.classList.remove('selected'));picked.classList.add('selected')}haptic(true)}
+function matchPick(side,id){
+  const m=match;
+  if(!m||!Array.isArray(m.pairs)||!m.pairs.length)return;
+  const key=String(id);
+  if(side!=='L'&&side!=='R')return;
+  if((side==='L'&&m.usedL.has(key))||(side==='R'&&m.usedR.has(key)))return;
+  if(side==='L')m.selectedL=key;else m.selectedR=key;
+  if(m.selectedL!==null&&m.selectedR!==null){
+    const l=String(m.selectedL),r=String(m.selectedR);
+    m.selectedL=null;m.selectedR=null;
+    const leftWord=m.pairs.find(w=>String(w.id)===l);
+    const rightWord=m.pairs.find(w=>String(w.id)===r);
+    if(!leftWord||!rightWord){
+      console.error('Matching selection is not in the active batch:',{leftId:l,rightId:r});
+      render();
+      return;
+    }
+    const leftBtn=document.querySelector('[data-match-side="L"][data-match-id="'+CSS.escape(l)+'"]');
+    const rightBtn=document.querySelector('[data-match-side="R"][data-match-id="'+CSS.escape(r)+'"]');
+    if(l===r){
+      m.usedL.add(l);m.usedR.add(r);m.statusL[l]='ok';m.statusR[r]='ok';
+      m.miss.delete(leftWord.id);weightedCorrect('match',leftWord.id);
+      if(!m.solved.has(l)){m.solved.add(l);m.correct++}
+      if(leftBtn){leftBtn.classList.remove('selected');leftBtn.classList.add('correct');leftBtn.disabled=true}
+      if(rightBtn){rightBtn.classList.remove('selected');rightBtn.classList.add('correct');rightBtn.disabled=true}
+      haptic(true);
+    }else{
+      m.usedL.add(l);m.failedL.add(l);m.statusL[l]='bad';m.statusR[r]='';
+      m.miss.add(leftWord.id);weightedWrong('match',leftWord.id);m.pool.push(leftWord);m.wrongCount++;
+      if(leftBtn){leftBtn.classList.remove('selected');leftBtn.classList.add('wrong');leftBtn.disabled=true}
+      if(rightBtn){rightBtn.classList.remove('selected','wrong');rightBtn.disabled=false}
+      haptic(false);
+    }
+    const done=m.usedR.size===m.pairs.length;
+    if(done){
+      setTimeout(()=>{nextMatchBatch();if(page==='task'&&task==='match'&&match?.pairs?.length)refreshMatchBoard();else render()},450);
+    }else{
+      const remainingL=m.left.some(w=>!m.usedL.has(String(w.id)));
+      if(!remainingL)setTimeout(()=>{nextMatchBatch();if(page==='task'&&task==='match'&&match?.pairs?.length)refreshMatchBoard();else render()},450);
+    }
+    return;
+  }
+  const picked=document.querySelector('[data-match-side="'+side+'"][data-match-id="'+CSS.escape(key)+'"]');
+  if(picked){
+    document.querySelectorAll('[data-match-side="'+side+'"].selected').forEach(el=>el.classList.remove('selected'));
+    picked.classList.add('selected');
+  }
+  haptic(true);
+}
 function writeView(){const w=write.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;return `${taskHeader('write',write.index,write.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">WRITING</div><div class="flash-word" style="font-size:30px">${esc(w.translation)}</div><form onsubmit="event.preventDefault();checkWrite()"><label class="field-label" for="answer">Type the English word</label><div class="answerline"><input id="answer" class="field" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the English word" value=""/><button class="btn primary" type="submit">Check answer</button></div></form><div id="feedback" style="margin-top:14px">${write.feedback?`<p>${esc(write.feedback)}</p>`:''}</div></section>`}
 function checkWrite(){const input=$('#answer'),val=input?.value.trim();if(!val)return toast('Enter your answer.');const w=write.items.shift(),ok=norm(val)===norm(w.word);if(ok){weightedCorrect('write',w.id);write.correct++;write.miss.delete(w.id);write.feedback=`✓ Correct: ${w.word}`}else{weightedWrong('write',w.id);write.miss.add(w.id);write.items.push(w);write.feedback=`Incorrect. Correct answer: ${w.word} — this word will appear again.`}write.index++;haptic(ok);if(!write.items.length){finishTask('write',write.correct,write.all.length,write.miss);return}render()}
 function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’‘`]/g,"'").replace(/[^\p{L}\p{N}' ]/gu,' ').replace(/\s+/g,' ').trim()}
@@ -1240,6 +1301,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   // Bridge helpers across the separate script scopes used by the task views.
   window.engliwordsGetActiveTaskWords=()=>activeTaskWords;
   window.engliwordsWordStatusBadge=w=>wordStatusBadge(w);
+  window.engliwordsWordStatusLabel=w=>statusText[wordStatus(w)]||'New';
   const exerciseStages=[
     {id:'flash',title:'Flashcards',desc:'Recall the meaning'},
     {id:'match',title:'Matching',desc:'Match words and meanings'},
@@ -1274,7 +1336,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     }catch(error){
       console.error('Engliwords exercise launch failed:',error?.stack||error);
       const detail=String(error?.message||error||'Unknown error').slice(0,110);
-      toast('Matching launch error: '+detail);
+      toast('Could not open '+(exerciseStages[stageIndex]?.title||'exercise')+': '+detail);
     }
   };
   function allResultsWords(){return ['new','learning','ready'].flatMap(status=>wordsForStatus(status))}
