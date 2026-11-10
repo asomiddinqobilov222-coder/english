@@ -1265,23 +1265,16 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   function groupCards(){return exerciseTiles()}
   window.openExerciseStage=function(index){
     const stageIndex=Math.max(0,Math.min(3,Math.floor(Number(index)||0)));
-    const p=progressFor(),flow=p.groupFlow,group=flow?.group||'mixed';
-    // Matching is initialized directly to avoid the shared task-start wrapper
-    // restoring an outdated word queue or leaving the match board uninitialized.
-    if(stageIndex===1){
-      const ids=Array.isArray(flow?.wordIds)?new Set(flow.wordIds.map(String)):null;
-      let words=ids?S.words.filter(w=>ids.has(String(w.id))):[];
-      if(!words.length)words=activeTaskWords?.length?[...activeTaskWords]:[...S.words];
-      if(!words.length){toast('Add words to your vocabulary before starting Matching.');return}
-      activeGroup=group;activeTaskWords=words;taskFlowIndex=1;
-      p.groupFlow={group,wordIds:words.map(w=>w.id),index:1,results:flow?.results||{},startedAt:flow?.startedAt||Date.now()};
-      initTaskWeights('match',words);
-      match={pool:[...words],all:[...words],miss:new Set(),correct:0,round:0,selectedL:null,selectedR:null,usedL:new Set(),usedR:new Set(),pairs:[],statusL:{},statusR:{},solved:new Set()};
-      task='match';page='task';taskTransitionLabel='Matching';save();render();
-      window.setTimeout(()=>{taskTransitionLabel='';if(page==='task'&&task==='match')render()},850);
-      return;
+    const p=progressFor(),group=p.groupFlow?.group||'mixed';
+    // All four exercises use the same word-set and task initialization pipeline.
+    // This avoids a separate Matching state that can drift from the normal task flow.
+    if(!S.words.length){toast('Add words to your vocabulary before starting practice.');return}
+    try{
+      window.startGroupTask(group,stageIndex);
+    }catch(error){
+      console.error('Engliwords exercise launch failed:',error);
+      toast('Could not open '+(exerciseStages[stageIndex]?.title||'this exercise')+'. Please try again.');
     }
-    window.startGroupTask(group,stageIndex);
   };
   function allResultsWords(){return ['new','learning','ready'].flatMap(status=>wordsForStatus(status))}
   function resultListHTML(){
@@ -1532,12 +1525,12 @@ body .app .translator-action-row .translator-icon-btn.mic.is-listening{backgroun
 
 /* Unified palette for ordinary action buttons only.
    Preserve the original streak/theme controls and the bottom navigation's inactive/active states. */
-button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
+button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.cal-day.flame-day):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
   background:linear-gradient(135deg,#74f2df,#65bfff 58%,#a4a0ff)!important;
   color:#101735!important;
   border:1px solid #ffffff55!important;
 }
-body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
+body[data-theme="day"] button:not(.switch):not(.flashcard-scene):not(.choice.selected):not(.choice.correct):not(.choice.wrong):not(.cal-day.full):not(.cal-day.partial):not(.cal-day.flame-day):not(.mic.is-listening):not(.streak):not(.theme-toggle):not(.bottom-nav button){
   background:linear-gradient(145deg,#38c9b5,#198fba 65%,#4b77e8)!important;
   color:#fff!important;
   border:1px solid #ffffff75!important;
