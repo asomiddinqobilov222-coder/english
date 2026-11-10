@@ -1256,26 +1256,17 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
   function exerciseTiles(){
     const p=progressFor(),flow=p.groupFlow,results=flow?.results||{};
     const passed=id=>Number(p.modes[id]?.score)>=70||Number(results[id]?.score)>=70;
-    let current=flow&&Array.isArray(flow.wordIds)&&flow.wordIds.length?Math.max(0,Math.min(3,Number(flow.index)||0)):exerciseStages.findIndex(x=>!passed(x.id));
-    if(current<0)current=4;
     return '<div class="exercise-grid">'+exerciseStages.map((stage,index)=>{
-      const complete=passed(stage.id),locked=index>current&&!complete,available=index===current;
-      const state=complete?'<span class="exercise-state complete">Completed</span>':available?'<span class="exercise-state current">Start here</span>':'<span class="exercise-state locked">Locked</span>';
-      const lockIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-      return '<div class="exercise-tile '+(available?'is-current ':'')+(locked?'is-locked ':'')+(complete?'is-complete':'')+'" role="button" tabindex="0" aria-disabled="'+(locked||complete)+'" onclick="openExerciseStage('+index+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openExerciseStage('+index+')}"><span class="exercise-art '+(locked?'is-lock':'')+'">'+(locked?lockIcon:exerciseIcon(stage.id))+'</span><span class="exercise-copy"><b>'+stage.title+'</b><small>'+stage.desc+'</small>'+state+'</span></div>';
+      const complete=passed(stage.id);
+      const state=complete?'<span class="exercise-state complete">Completed · Practice again</span>':'<span class="exercise-state current">Tap to practice</span>';
+      return '<div class="exercise-tile '+(complete?'is-complete':'')+'" role="button" tabindex="0" aria-disabled="false" onclick="openExerciseStage('+index+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openExerciseStage('+index+')}"><span class="exercise-art">'+exerciseIcon(stage.id)+'</span><span class="exercise-copy"><b>'+stage.title+'</b><small>'+stage.desc+'</small>'+state+'</span></div>';
     }).join('')+'</div>';
   }
   function groupCards(){return exerciseTiles()}
   window.openExerciseStage=function(index){
-    const p=progressFor(),flow=p.groupFlow,results=flow?.results||{};
-    const passed=id=>Number(p.modes[id]?.score)>=70||Number(results[id]?.score)>=70;
-    let current=flow&&Array.isArray(flow.wordIds)&&flow.wordIds.length?Math.max(0,Math.min(3,Number(flow.index)||0)):exerciseStages.findIndex(x=>!passed(x.id));
-    if(current<0)current=4;
-    if(index>current){toast('Complete the previous exercises first.');return}
-    if(index<current){toast('This exercise has already been completed.');return}
-    if(index>3||current===4){toast('All four exercises are complete.');return}
-    if(!flow||!Array.isArray(flow.wordIds)||!flow.wordIds.length)window.startGroupTask('mixed',index);
-    else window.startGroupTask(flow.group||'mixed',index);
+    const stageIndex=Math.max(0,Math.min(3,Math.floor(Number(index)||0)));
+    const flow=progressFor().groupFlow;
+    window.startGroupTask(flow?.group||'mixed',stageIndex);
   };
   function allResultsWords(){return ['new','learning','ready'].flatMap(status=>wordsForStatus(status))}
   function resultListHTML(){
@@ -1385,7 +1376,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
       const words=S.words.filter(w=>savedSet.has(String(w.id)));
       if(words.length){
         activeTaskWordsNext=words;
-        startAt=Math.max(0,Math.min(3,Number(saved.index)||0));
+        // Respect the stage selected in the task list.
         priorResults=saved.results||{};
       }
     }
@@ -1398,12 +1389,11 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
         toast('Add words to your vocabulary before starting practice.');
         return;
       }
-      startAt=0;
       priorResults={};
       p.groupFlow={
         group,
         wordIds:activeTaskWordsNext.map(w=>w.id),
-        index:0,
+        index:startAt,
         results:{},
         startedAt:Date.now()
       };
