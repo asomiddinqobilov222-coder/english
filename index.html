@@ -1432,80 +1432,42 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     recordWordScores(id,pool);
     const score=scoreForAttempt(id,pool,total,correct);
     const currentResult={score,correct,total,at:Date.now()};
+    const previous=p.modes[id],previousPassed=Number(previous?.score)>=70;
+    const best=previousPassed&&Number(previous.score)>score?previous:currentResult;
+    const passed=score>=70;
 
-    // Standalone practice (for example, repeating one exercise from its result screen).
-    if(!activeTaskWords||!p.groupFlow||!Array.isArray(p.groupFlow.wordIds)){
-      activeTaskWords=null;activeGroup=null;taskFlowIndex=0;taskTransitionLabel='';
-      const previous=p.modes[id],previousPassed=Number(previous?.score)>=70;
-      const keepPrevious=previousPassed&&Number(previous.score)>score;
-      const best=keepPrevious?previous:currentResult;
-      const passed=score>=70||previousPassed;
-      if(passed){
-        if(score>=70)markReviewed(pool,missedSet);
-        p.modes[id]=best;p.tasks[id]=best;
-      }else{
-        delete p.modes[id];delete p.tasks[id];
-      }
-      p.score=Math.round(MODES.reduce((sum,m)=>sum+(Number(p.modes[m.id]?.score)||0),0)/4);
-      const history=S.history[today()]||{};
-      history[id]={score:best.score,correct:best.correct,total:best.total,passed};
-      S.history[today()]=history;
-      save();task=null;page='result';
-      matchState={id,correct:best.correct,total:best.total,score:best.score,miss:[...missedSet],passed};
-      render();return;
-    }
-
-    p.groupFlow.results=p.groupFlow.results||{};
-    p.groupFlow.results[id]={...currentResult,passed:score>=70};
-
-    // A stage below 70% must be repeated; it must not advance the four-stage flow.
-    if(score<70){
-      p.groupFlow.index=taskFlowIndex;
-      save();task=null;page='result';
-      matchState={id,correct,total,score,miss:[...missedSet],passed:false};
-      render();return;
-    }
+    if(passed||previousPassed){p.modes[id]=best;p.tasks[id]=best}
+    else{delete p.modes[id];delete p.tasks[id]}
 
     const orderedModes=['flash','match','write','sentence'];
-    taskFlowIndex++;
-    if(taskFlowIndex<orderedModes.length){
-      p.groupFlow.index=taskFlowIndex;save();
-      const next=orderedModes[taskFlowIndex];
-      setTaskTransition(next);startTask(next);
-      setTimeout(()=>{taskTransitionLabel='';if(page==='task')render()},850);
-      return;
-    }
-
-    // Guard against older/incomplete saved flows: every stage must have a passing result.
-    const failedIndex=orderedModes.findIndex(mode=>{
-      const item=p.groupFlow.results[mode];
-      return !item||!Number.isFinite(Number(item.score))||Number(item.score)<70;
-    });
-    if(failedIndex>=0){
-      taskFlowIndex=failedIndex;p.groupFlow.index=failedIndex;
-      const failedMode=orderedModes[failedIndex];
-      const failedResult=p.groupFlow.results[failedMode]||{score:0,correct:0,total:activeTaskWords.length};
-      save();task=null;page='result';
-      matchState={id:failedMode,correct:Number(failedResult.correct)||0,total:Number(failedResult.total)||activeTaskWords.length,score:Number(failedResult.score)||0,miss:[],passed:false};
-      render();return;
+    if(activeTaskWords&&p.groupFlow&&Array.isArray(p.groupFlow.wordIds)){
+      p.groupFlow.results=p.groupFlow.results||{};
+      p.groupFlow.results[id]={...currentResult,passed};
+      const selectedIndex=orderedModes.indexOf(id);
+      if(selectedIndex>=0)p.groupFlow.index=selectedIndex;
     }
 
     const history=S.history[today()]||{};
-    for(const mode of orderedModes){
-      const item=p.groupFlow.results[mode];
-      p.modes[mode]=item;p.tasks[mode]=item;
-      history[mode]={score:item.score,correct:item.correct,total:item.total,passed:true};
-    }
+    history[id]={score:best.score,correct:best.correct,total:best.total,passed:Number(best.score)>=70};
     S.history[today()]=history;
-    // SRS advances only after all four exercises reach the passing threshold.
-    markReviewed(activeTaskWords,new Set());
-    p.score=Math.round(orderedModes.reduce((sum,mode)=>sum+(Number(p.modes[mode]?.score)||0),0)/orderedModes.length);
-    const finalResult=p.groupFlow.results[id]||currentResult;
-    delete p.groupFlow;save();
-    activeGroup=null;activeTaskWords=null;taskFlowIndex=0;taskTransitionLabel='';
-    task=null;matchState={id,correct:finalResult.correct,total:finalResult.total,score:finalResult.score,miss:[],passed:true};
-    page='result';render();
-  };
+
+    const groupCompleted=!!(activeTaskWords&&p.groupFlow&&orderedModes.every(mode=>
+      Number(p.modes[mode]?.score)>=70||Number(p.groupFlow.results?.[mode]?.score)>=70
+    ));
+    if(groupCompleted){
+      // Advance spaced repetition only after all four exercises have passed.
+      markReviewed(activeTaskWords,new Set());
+      delete p.groupFlow;
+      activeGroup=null;activeTaskWords=null;taskFlowIndex=0;taskTransitionLabel='';
+    }
+
+    p.score=Math.round(MODES.reduce((sum,m)=>sum+(Number(p.modes[m.id]?.score)||0),0)/4);
+    save();
+    task=null;page='tasks';
+    matchState={id,correct,total,score,miss:[...missedSet],passed:score>=70};
+    render();
+    toast(passed?(modeLabels[id]||id)+' completed — '+score+'%.':(modeLabels[id]||id)+': '+score+'%. At least 70% is needed.');
+    };
   // Add persistent per-word fields to words created before this feature.
   S.words.forEach(w=>{learningData(w);wordStatus(w)});
   // Profile view should use the app's own title, not a host-derived title.
