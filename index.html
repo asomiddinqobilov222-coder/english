@@ -1638,4 +1638,25 @@ body[data-theme="day"] .exercise-state.locked{color:#8a9aaa}
 .flame{display:inline-flex;align-items:center;justify-content:center}
 .flame svg{width:26px;height:30px}
 @media(min-width:600px){.exercise-grid{grid-template-columns:1fr 1fr}.exercise-tile{min-height:128px}}
+</style>
+<style id="engliwords-task-calendar-chart-fixes">
+/* Calendar days: the date sits inside a lit flame or above an extinguished campfire. */
+.cal-day.flame-day{padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;border-radius:10px;display:grid;place-items:center;overflow:visible}
+.cal-day.flame-day:hover{box-shadow:none!important;transform:translateY(-1px);filter:brightness(1.06)}
+.cal-day.flame-day .calendar-day-icon{display:block;width:100%;height:100%;max-width:38px;max-height:38px;pointer-events:none;overflow:visible}
+.cal-day.flame-day.unlit{color:var(--muted)}
+.cal-day.flame-day.today{outline:2px solid var(--cyan);outline-offset:0}
+body[data-theme="day"] .cal-day.flame-day.today{outline-color:#277bb2}
+/* One-week progress navigation with a slide transition in the swipe direction. */
+.chart-wrap{overflow:hidden;touch-action:pan-y}
+.chart-wrap svg.chart-slide-svg{position:absolute;inset:0;display:block;width:100%;height:100%;max-width:100%}
+.chart-slide-out-left{animation:chart-slide-out-left .26s cubic-bezier(.22,.72,.24,1) both}
+.chart-slide-out-right{animation:chart-slide-out-right .26s cubic-bezier(.22,.72,.24,1) both}
+.chart-slide-in-right{animation:chart-slide-in-right .26s cubic-bezier(.22,.72,.24,1) both}
+.chart-slide-in-left{animation:chart-slide-in-left .26s cubic-bezier(.22,.72,.24,1) both}
+@keyframes chart-slide-out-left{from{transform:translateX(0);opacity:1}to{transform:translateX(-100%);opacity:.25}}
+@keyframes chart-slide-out-right{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:.25}}
+@keyframes chart-slide-in-right{from{transform:translateX(100%);opacity:.25}to{transform:translateX(0);opacity:1}}
+@keyframes chart-slide-in-left{from{transform:translateX(-100%);opacity:.25}to{transform:translateX(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.chart-slide-out-left,.chart-slide-out-right,.chart-slide-in-left,.chart-slide-in-right{animation:none!important}}
 </style></body></html>
