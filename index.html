@@ -247,7 +247,7 @@ function persistAiKey(_key,provider,model){aiProvider='groq';if(model)aiModel=mo
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),lastReviewedOn:String(w.lastReviewedOn||w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
-const MODES=[{id:'flash',icon:'',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'',title:'Sentence building',desc:'Translate the sentence into English'}];
+const MODES=[{id:'flash',icon:'',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'',title:'Missing Word',desc:'Choose the word that completes the sentence'}];
 let page='home',task=null,modalResolve=null,flash=null,match=null,write=null,sentence=null,translator={sl:'en',tl:window.engNativeCode(),result:'',examples:[]},matchState=null;
 const sentenceAiPending=new Set(),sentenceAiError=new Set();
 function progressFor(k=today()){if(!S.progress[k])S.progress[k]={words:S.words.filter(w=>due(w)).map(w=>w.id),modes:{},tasks:{},score:0};const p=S.progress[k];p.modes=p.modes||{};p.tasks=p.tasks||{};if(!Array.isArray(p.words))p.words=[];return p}
@@ -432,7 +432,7 @@ async function aiExamples(word,translation){
  const safeWord=String(word||'').trim(),safeTranslation=String(translation||'').trim();
  if(!safeWord||!safeTranslation)throw new Error('The word and its translation are required.');
  const nativeName=window.engNativeName();
- const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must use the target word or a natural inflected form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural translation of the whole sentence into '+nativeName+'. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Native-language translation"},"normal":{"en":"English sentence","uz":"Native-language translation"},"hard":{"en":"English sentence","uz":"Native-language translation"}}}. No markdown, no extra text.';
+ const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must include the exact target word spelling as provided; do not change its tense, number, or form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural translation of the whole sentence into '+nativeName+'. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Native-language translation"},"normal":{"en":"English sentence","uz":"Native-language translation"},"hard":{"en":"English sentence","uz":"Native-language translation"}}}. No markdown, no extra text.';
  const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b'),messages:[
   {role:'system',content:'You are a precise English teacher for multilingual English learners. Create short, grammatically correct example sentences and accurate natural translations into '+nativeName+'. Output valid JSON only. Translate each complete sentence, not just the vocabulary word.'},
   {role:'user',content:prompt}
@@ -562,9 +562,38 @@ function matchPick(side,id){
 function writeView(){const w=write.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;return `${taskHeader('write',write.index,write.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">WRITING</div><div class="flash-word" style="font-size:30px">${esc(w.translation)}</div><form onsubmit="event.preventDefault();checkWrite()"><label class="field-label" for="answer">Type the English word</label><div class="answerline"><input id="answer" class="field" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the English word" value=""/><button class="btn primary" type="submit">Check answer</button></div></form><div id="feedback" style="margin-top:14px">${write.feedback?`<p>${esc(write.feedback)}</p>`:''}</div></section>`}
 function checkWrite(){const input=$('#answer'),val=input?.value.trim();if(!val)return toast('Enter your answer.');const w=write.items.shift(),ok=norm(val)===norm(w.word);if(ok){weightedCorrect('write',w.id);write.correct++;write.miss.delete(w.id);write.feedback=`✓ Correct: ${w.word}`}else{weightedWrong('write',w.id);write.miss.add(w.id);write.items.push(w);write.feedback=`Incorrect. Correct answer: ${w.word} — this word will appear again.`}write.index++;haptic(ok);if(!write.items.length){finishTask('write',write.correct,write.all.length,write.miss);return}render()}
 function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’‘`]/g,"'").replace(/[^\p{L}\p{N}' ]/gu,' ').replace(/\s+/g,' ').trim()}
-function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz||w.examples?.nativeLanguage!==window.engNativeCode()){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">SENTENCE BUILDING · AI</div><h3 class="section-title">${loading?'Preparing a sentence…':failed?'Could not prepare the sentence':'AI is preparing a sentence'}</h3><p class="subhead">${loading?'AI is preparing a sentence in your native language and its English translation.':failed?('AI error: '+esc(aiLastError||'Check your API key, internet connection, or API limit.')):'No saved example is available. AI will generate a new one.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Try again</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profile and API key</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Please wait a moment.':'A new sentence is being generated for this word.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">MAKING SENTENCES · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Target word: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Check answer</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
-async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Unknown AI error';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
-function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
+const MISSING_WORD_FALLBACK=['because','quickly','beautiful','between','decide','journey','although','improve','carry','choose','discover','careful','perhaps','already','enough','follow','bright','during','return','answer'];
+function shuffleMissingWord(items){const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}return out}
+function escapeMissingWordRegex(value){const special='\\^$.*+?()[]{}|';return [...String(value||'')].map(ch=>special.includes(ch)?'\\'+ch:ch).join('')}
+function buildMissingWordQuestion(word,preferredLevel){
+ const levels=[preferredLevel,'easy','normal','hard'].filter((x,i,a)=>x&&a.indexOf(x)===i);let selected=null;
+ for(const level of levels){const ex=word.examples?.[level];if(!ex?.en||(word.examples?.nativeLanguage&&word.examples.nativeLanguage!==window.engNativeCode()))continue;const pattern=new RegExp('(^|[^A-Za-z])('+escapeMissingWordRegex(word.word)+')(?=$|[^A-Za-z])','i');if(pattern.test(String(ex.en))){selected={level,ex,pattern};break}}
+ if(!selected)return null;
+ const sentence=String(selected.ex.en).replace(selected.pattern,(whole,prefix)=>prefix+'________');
+ const seen=new Set([String(word.word||'').trim().toLocaleLowerCase()]);const options=[{word:String(word.word).trim(),correct:true}];
+ const personal=shuffleMissingWord((S.words||[]).filter(x=>x&&x.id!==word.id&&String(x.word||'').trim()));
+ for(const item of personal){const label=String(item.word).trim(),key=label.toLocaleLowerCase();if(!key||seen.has(key))continue;seen.add(key);options.push({word:label,correct:false});if(options.length===4)break}
+ if(options.length<4){for(const label of shuffleMissingWord(MISSING_WORD_FALLBACK)){const key=label.toLocaleLowerCase();if(seen.has(key))continue;seen.add(key);options.push({word:label,correct:false});if(options.length===4)break}}
+ if(options.length!==4)return null;
+ return {wordId:word.id,level:selected.level,sentence,options:shuffleMissingWord(options),selected:null,checked:false,correctWord:word.word};
+}
+function sentenceView(){
+ const w=sentence?.items?.[0];if(!w)return '<div class="panel">Practice completed.</div>';
+ if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w);sentence.question=null}
+ const level=sentence.currentLevel||levelFor(w);if(!sentence.question||sentence.question.wordId!==w.id)sentence.question=buildMissingWordQuestion(w,level);
+ if(!sentence.question){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id,true);const loading=sentenceAiPending.has(w.id),failed=sentenceAiError.has(w.id);return taskHeader('sentence',sentence.index,sentence.all.length)+'<section class="panel task-area">'+window.engliwordsWordStatusBadge(w)+'<div class="eyebrow">MISSING WORD</div><h3 class="section-title">'+(loading?'Preparing a sentence…':failed?'A suitable sentence is not available':'Preparing your question')+'</h3><p class="subhead">'+(loading?'Creating a short sentence using this vocabulary word.':failed?esc(aiLastError||'Check your AI connection and try again.'):'Finding a sentence that contains the exact vocabulary word.')+'</p>'+(failed?'<button class="btn primary full" onclick="retrySentenceAI(\''+esc(w.id)+'\')">Try again</button>':'')+'</section>'}
+ const q=sentence.question;
+ const options=q.options.map((option,index)=>{const state=q.checked?(option.correct?' correct':q.selected===index?' wrong':''):(q.selected===index?' selected':'');return '<button type="button" class="choice missing-word-option'+state+'" onclick="selectMissingWord('+index+')" '+(q.checked?'disabled':'')+' aria-pressed="'+(q.selected===index?'true':'false')+'">'+esc(option.word)+'</button>'}).join('');
+ const feedback=q.checked?'<div class="missing-word-feedback '+(q.options[q.selected]?.correct?'is-correct':'is-wrong')+'">'+(q.options[q.selected]?.correct?'Correct! ':'Not quite. Correct answer: ')+esc(q.correctWord)+'</div>':'';
+ const action=q.checked?'<button class="btn primary full" onclick="nextMissingWord()">Next</button>':'<button class="btn primary full" onclick="checkMissingWord()">Check answer</button>';
+ return taskHeader('sentence',sentence.index,sentence.all.length)+'<section class="panel task-area missing-word-panel">'+window.engliwordsWordStatusBadge(w)+'<div class="eyebrow">MISSING WORD · '+String(q.level).toUpperCase()+'</div><h3 class="section-title">Choose the word that completes the sentence.</h3><div class="missing-word-sentence">'+esc(q.sentence)+'</div><div class="choices missing-word-choices">'+options+'</div>'+feedback+action+'</section>';
+}
+function selectMissingWord(index){const q=sentence?.question;if(!q||q.checked||index<0||index>=q.options.length)return;q.selected=index;render()}
+function checkMissingWord(){const q=sentence?.question,w=sentence?.items?.[0];if(!q||!w||q.checked)return;if(q.selected===null||q.selected===undefined)return toast('Choose an answer first.');const correct=!!q.options[q.selected]?.correct;if(correct){weightedCorrect('sentence',w.id);sentence.correct++;sentence.miss.delete(w.id)}else{weightedWrong('sentence',w.id);sentence.miss.add(w.id);sentence.retryCurrent=true}q.checked=true;haptic(correct);render()}
+function nextMissingWord(){if(!sentence?.items?.length||!sentence.question?.checked)return;const current=sentence.items.shift();if(sentence.retryCurrent){sentence.items.push(current);sentence.retryCurrent=false}sentence.index++;sentence.question=null;if(!sentence.items.length)finishTask('sentence',sentence.correct,sentence.all.length,sentence.miss);else render()}
+async function loadSentenceExamples(id,force=false){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples=force?ex:{...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('Example sentences are ready.')}catch(e){aiLastError=e?.message||'Unknown AI error';console.error('Missing Word sentence generation failed:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
+function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id,true)}
+
 async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'){
  if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
  const needNext=!!(nextWord&&nextWord.word&&nextWord.translation&&!nextWord.examples?.easy?.en&&!nextWord.examples?.normal?.en&&!nextWord.examples?.hard?.en);
@@ -617,27 +646,6 @@ async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'
  }
  return {score:Math.max(0,Math.min(100,Math.round(score))),feedback,nextExample};
 }
-async function checkSentence(){
- const input=$('#sentence-answer'),val=input?.value.trim();
- if(!val)return toast('Enter your answer.');
- const w=sentence.items[0],level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;
- if(!ex?.en){toast('No example is available for this word. Generate examples again.');return}
- const button=$('.panel form button');
- if(button?.disabled)return;
- if(button){button.disabled=true;button.textContent='AI is checking your answer…'}
- let result;
- const nextWord=sentence.items[1]||null,nextLevel=nextWord?levelFor(nextWord):'easy';
- try{result=await aiGradeSentence(val,ex.en,w.word,nextWord,nextLevel);
-  if(result.nextExample&&nextWord){nextWord.examples=nextWord.examples||{};nextWord.examples[nextLevel]=result.nextExample;save()}
- }
- catch(e){aiLastError=e?.message||'Unknown AI error';console.warn('AI sentence grading failed:',aiLastError);if(button){button.disabled=false;button.textContent='Check answer'}toast('AI tekshira olmadi: '+aiLastError.slice(0,140));return}
- const score=result.score/100,correct=score>=0.70;
- if(correct){weightedCorrect('sentence',w.id);sentence.correct++;sentence.miss.delete(w.id)}else{weightedWrong('sentence',w.id);sentence.miss.add(w.id);sentence.retryCurrent=true}
- sentence.feedback=`${correct?'✓ Good job!':'Correct answer:'} ${ex.en} · AI: ${result.score}% — ${result.feedback}`;
- const feedback=$('#sentence-feedback');if(feedback)feedback.textContent=sentence.feedback;
- if(button){button.disabled=false;button.textContent='Next sentence →';button.onclick=e=>{e.preventDefault();const current=sentence.items.shift();if(sentence.retryCurrent){sentence.items.push(current);sentence.retryCurrent=false}sentence.index++;if(!sentence.items.length)finishTask('sentence',sentence.correct,sentence.all.length,sentence.miss);else render()}}
- haptic(correct)
-}
 function wordOverlap(a,b){const aa=new Set(a.split(' ')),bb=b.split(' ');if(!bb.length)return 0;return bb.filter(x=>aa.has(x)).length/bb.length}
 function finishTask(id,correct,total,miss=new Set()){
  const p=progressFor(),pools={flash:flash?.all,match:match?.all,write:write?.all,sentence:sentence?.all},missed=miss instanceof Set?miss:new Set(miss||[]);
@@ -671,7 +679,7 @@ function calendarBodyHTML(){
  return '<div class="row spread" style="align-items:center;gap:8px"><button class="btn ghost small" onclick="changeCalendarMonth(-1)" aria-label="Previous month">‹</button><b>'+monthDate.toLocaleDateString('uz-UZ',{month:'long',year:'numeric'})+'</b><button class="btn ghost small" onclick="changeCalendarMonth(1)" aria-label="Next month">›</button></div><p class="subhead" style="margin-top:10px">Lit flame: practice completed · Extinguished campfire: no practice</p><div class="calendar" style="margin-top:15px">'+Array.from({length:7},(_,i)=>new Date(2024,0,1+i).toLocaleDateString('en-US',{weekday:'short'})).map(x=>'<div class="cal-head">'+x+'</div>').join('')+cells+'</div><div class="row spread" style="margin-top:15px"><span class="badge">Streak: '+streak()+' days</span><span class="badge">This month: '+practicedDays+' practice days</span></div>';
 }
 function changeCalendarMonth(delta){calendarMonthOffset=Math.max(-240,Math.min(240,calendarMonthOffset+delta));const wrap=$('#modal-root .calendar-month-content');if(!wrap){openCalendar();return}wrap.style.setProperty('--calendar-slide',delta<0?'-22px':'22px');wrap.classList.remove('is-sliding');wrap.innerHTML=calendarBodyHTML();void wrap.offsetWidth;wrap.classList.add('is-sliding')}
-function showCalendarDay(key){const p=S.progress[key],m=p?.modes||{},count=Object.keys(m).length,vals=Object.values(m).map(v=>Number(v.score)||0),pct=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/4):0,labels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Sentence building'},rows=Object.entries(m).map(([id,v])=>'<div class="list-item"><b>'+esc(labels[id]||id)+'</b><span class="badge">'+Math.round(Number(v.score)||0)+'%</span></div>').join(''),d=dayDate(key),dateLabel=d.toLocaleDateString('uz-UZ',{weekday:'long',day:'numeric',month:'long',year:'numeric'});modal(dateLabel,'<div class="calendar-detail"><div><span class="subhead">Daily progress</span><br><strong>'+pct+'%</strong></div><span class="badge">'+count+'/4 tasks</span></div><div style="margin-top:12px">'+(rows||'<p class="subhead">There are no practice results for this day yet.</p>')+'</div>')}
+function showCalendarDay(key){const p=S.progress[key],m=p?.modes||{},count=Object.keys(m).length,vals=Object.values(m).map(v=>Number(v.score)||0),pct=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/4):0,labels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Missing Word'},rows=Object.entries(m).map(([id,v])=>'<div class="list-item"><b>'+esc(labels[id]||id)+'</b><span class="badge">'+Math.round(Number(v.score)||0)+'%</span></div>').join(''),d=dayDate(key),dateLabel=d.toLocaleDateString('uz-UZ',{weekday:'long',day:'numeric',month:'long',year:'numeric'});modal(dateLabel,'<div class="calendar-detail"><div><span class="subhead">Daily progress</span><br><strong>'+pct+'%</strong></div><span class="badge">'+count+'/4 tasks</span></div><div style="margin-top:12px">'+(rows||'<p class="subhead">There are no practice results for this day yet.</p>')+'</div>')}
 function openCalendar(){
  modal('Practice calendar','<div class="calendar-month-content">'+calendarBodyHTML()+'</div>');
  const el=$('#modal-root .modal');if(el&&!el.dataset.swipeBound){el.dataset.swipeBound='1';let x=0,y=0,t=0;const down=(px,py)=>{x=px;y=py;t=Date.now()};const up=(px,py)=>{const dx=px-x,dy=py-y,elapsed=Date.now()-t;if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)*1.25){const distance=Math.abs(dx),speed=distance/Math.max(1,elapsed),steps=Math.min(3,Math.max(1,Math.round(distance/95)+Math.min(2,Math.floor(speed*5))));changeCalendarMonth((dx<0?1:-1)*steps)}};el.addEventListener('touchstart',e=>{const q=e.changedTouches[0];down(q.clientX,q.clientY)},{passive:true});el.addEventListener('touchend',e=>{const q=e.changedTouches[0];up(q.clientX,q.clientY)},{passive:true});el.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')down(e.clientX,e.clientY)},{passive:true});el.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')up(e.clientX,e.clientY)},{passive:true})}
@@ -1264,7 +1272,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     {id:'flash',label:'Flashcards'},
     {id:'match',label:'Matching'},
     {id:'write',label:'Write the English word'},
-    {id:'sentence',label:'Sentence translation'},
+    {id:'sentence',label:'Missing Word'},
     {id:'conversation',label:'Real conversations'}
   ];
   const statusText={new:'New',learning:'Learning',ready:'Ready to use'};
@@ -1306,7 +1314,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     {id:'flash',title:'Flashcards',desc:'Recall the meaning'},
     {id:'match',title:'Matching',desc:'Match words and meanings'},
     {id:'write',title:'Writing',desc:'Write the English word'},
-    {id:'sentence',title:'Making sentences',desc:'Build a complete sentence'}
+    {id:'sentence',title:'Missing Word',desc:'Complete the sentence'}
   ];
   function exerciseIcon(id){
     const common='viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"';
@@ -1425,7 +1433,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     }
     originalStartTask(id);
   };
-  const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Making sentences'};
+  const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Missing Word'};
   function setTaskTransition(id){taskTransitionLabel=modeLabels[id]||''}
   window.startGroupTask=function(group,requestedIndex=0){
     const p=progressFor();
@@ -1757,4 +1765,20 @@ body .calendar .cal-day.flame-day .calendar-day-icon{
  display:block;width:100%;height:100%;max-width:38px;max-height:38px;
  pointer-events:none;overflow:visible;
 }
+</style><style id="engliwords-missing-word-design">
+.missing-word-sentence{margin:18px 0 12px;padding:20px 16px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(85,230,208,.09),rgba(108,140,255,.10));font-size:clamp(20px,4.5vw,27px);font-weight:800;line-height:1.55;letter-spacing:-.35px;text-align:center;overflow-wrap:anywhere}
+.missing-word-choices{margin:12px 0 16px}
+button.missing-word-option{min-height:52px;padding:12px 10px;border:1px solid var(--line)!important;border-radius:14px!important;background:var(--panel2)!important;color:var(--text)!important;font-weight:750!important;box-shadow:none!important}
+button.missing-word-option.selected{border-color:var(--cyan)!important;background:#183b42!important;color:#eafffb!important}
+button.missing-word-option.correct{border-color:var(--green)!important;background:#14362f!important;color:#eafff4!important}
+button.missing-word-option.wrong{border-color:var(--red)!important;background:#3a202b!important;color:#fff0f2!important}
+button.missing-word-option:disabled{opacity:1;cursor:default}
+.missing-word-feedback{margin:0 0 14px;padding:12px 14px;border-radius:13px;font-weight:750}
+.missing-word-feedback.is-correct{background:#14362f;color:#b9f5d6}
+.missing-word-feedback.is-wrong{background:#3a202b;color:#ffd5dc}
+body[data-theme="day"] .missing-word-sentence{background:linear-gradient(135deg,#e8fbf7,#edf1ff);color:#18344d}
+body[data-theme="day"] button.missing-word-option{background:#f0f5fc!important;color:#18344d!important}
+body[data-theme="day"] button.missing-word-option.selected{background:#d9f5f0!important;color:#155c53!important}
+body[data-theme="day"] button.missing-word-option.correct{background:#ddf7e9!important;color:#17623c!important}
+body[data-theme="day"] button.missing-word-option.wrong{background:#ffe5e9!important;color:#8b2638!important}
 </style></body></html>
