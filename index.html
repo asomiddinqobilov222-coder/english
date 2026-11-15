@@ -247,7 +247,7 @@ function persistAiKey(_key,provider,model){aiProvider='groq';if(model)aiModel=mo
 restoreAiKeyForCurrentProfile();
 S.words=(Array.isArray(S.words)?S.words:[]).map(w=>({...w,id:String(w.id||uid()),word:String(w.word||''),translation:String(w.translation||''),added:w.added||today(),done:Array.isArray(w.done)?w.done.filter(n=>[0,1,3,7,14,30,60].includes(n)):[],reviewedOn:String(w.reviewedOn||''),lastReviewedOn:String(w.lastReviewedOn||w.reviewedOn||''),examples:normalizeExamples(w.examples,w.example)}));
 function normalizeExamples(ex,old){if(ex&&typeof ex==='object')return ex;return {easy:old?{en:String(old),uz:''}:null,normal:null,hard:null}}
-const MODES=[{id:'flash',icon:'',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'',title:'Sentence building',desc:'Translate the sentence into English'}];
+const MODES=[{id:'flash',icon:'',title:'Flashcards',desc:'Remember the word'},{id:'match',icon:'',title:'Matching',desc:'Match each word with its translation'},{id:'write',icon:'',title:'Writing',desc:'Type the English word'},{id:'sentence',icon:'',title:'Missing Word',desc:'Choose the word that completes the sentence'}];
 let page='home',task=null,modalResolve=null,flash=null,match=null,write=null,sentence=null,translator={sl:'en',tl:window.engNativeCode(),result:'',examples:[]},matchState=null;
 const sentenceAiPending=new Set(),sentenceAiError=new Set();
 function progressFor(k=today()){if(!S.progress[k])S.progress[k]={words:S.words.filter(w=>due(w)).map(w=>w.id),modes:{},tasks:{},score:0};const p=S.progress[k];p.modes=p.modes||{};p.tasks=p.tasks||{};if(!Array.isArray(p.words))p.words=[];return p}
@@ -432,7 +432,7 @@ async function aiExamples(word,translation){
  const safeWord=String(word||'').trim(),safeTranslation=String(translation||'').trim();
  if(!safeWord||!safeTranslation)throw new Error('The word and its translation are required.');
  const nativeName=window.engNativeName();
- const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must use the target word or a natural inflected form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural translation of the whole sentence into '+nativeName+'. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Native-language translation"},"normal":{"en":"English sentence","uz":"Native-language translation"},"hard":{"en":"English sentence","uz":"Native-language translation"}}}. No markdown, no extra text.';
+ const prompt='Create exactly three short, natural English example sentences for the English vocabulary word '+JSON.stringify(safeWord)+' meaning '+JSON.stringify(safeTranslation)+'. Every English sentence must include the exact target word spelling as provided; do not change its tense, number, or form. Make easy, normal, and hard levels progressively more challenging. For each sentence give a natural translation of the whole sentence into '+nativeName+'. Return ONLY one valid JSON object with this exact shape: {"examples":{"easy":{"en":"English sentence","uz":"Native-language translation"},"normal":{"en":"English sentence","uz":"Native-language translation"},"hard":{"en":"English sentence","uz":"Native-language translation"}}}. No markdown, no extra text.';
  const payload={model:aiModel||(aiProvider==='xai'?'grok-4.7':'qwen/qwen3.8-27b'),messages:[
   {role:'system',content:'You are a precise English teacher for multilingual English learners. Create short, grammatically correct example sentences and accurate natural translations into '+nativeName+'. Output valid JSON only. Translate each complete sentence, not just the vocabulary word.'},
   {role:'user',content:prompt}
@@ -563,8 +563,9 @@ function writeView(){const w=write.items[0];if(!w)return `<div class="panel">Pra
 function checkWrite(){const input=$('#answer'),val=input?.value.trim();if(!val)return toast('Enter your answer.');const w=write.items.shift(),ok=norm(val)===norm(w.word);if(ok){weightedCorrect('write',w.id);write.correct++;write.miss.delete(w.id);write.feedback=`✓ Correct: ${w.word}`}else{weightedWrong('write',w.id);write.miss.add(w.id);write.items.push(w);write.feedback=`Incorrect. Correct answer: ${w.word} — this word will appear again.`}write.index++;haptic(ok);if(!write.items.length){finishTask('write',write.correct,write.all.length,write.miss);return}render()}
 function norm(s){return String(s||'').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’‘`]/g,"'").replace(/[^\p{L}\p{N}' ]/gu,' ').replace(/\s+/g,' ').trim()}
 function sentenceView(){const w=sentence.items[0];if(!w)return `<div class="panel">Practice completed.</div>`;if(sentence.currentIndex!==sentence.index){sentence.currentIndex=sentence.index;sentence.currentLevel=levelFor(w)}const level=sentence.currentLevel||levelFor(w),ex=w.examples?.[level]||w.examples?.easy||w.examples?.normal||w.examples?.hard;if(!ex?.en||!ex?.uz||w.examples?.nativeLanguage!==window.engNativeCode()){if(!sentenceAiPending.has(w.id)&&!sentenceAiError.has(w.id))loadSentenceExamples(w.id);const loading=sentenceAiPending.has(w.id);const failed=sentenceAiError.has(w.id);return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">SENTENCE BUILDING · AI</div><h3 class="section-title">${loading?'Preparing a sentence…':failed?'Could not prepare the sentence':'AI is preparing a sentence'}</h3><p class="subhead">${loading?'AI is preparing a sentence in your native language and its English translation.':failed?('AI error: '+esc(aiLastError||'Check your API key, internet connection, or API limit.')):'No saved example is available. AI will generate a new one.'}</p><div class="flash-word" style="font-size:24px">${esc(w.translation)}</div>${failed?`<button class="btn primary full" onclick="retrySentenceAI('${w.id}')">Try again</button><button class="btn ghost full" style="margin-top:8px" onclick="go('profile')">Profile and API key</button>`: `<div class="subhead" style="margin-top:12px">${loading?'Please wait a moment.':'A new sentence is being generated for this word.'}</div>`}</section>`}return `${taskHeader('sentence',sentence.index,sentence.all.length)}<section class="panel">${window.engliwordsWordStatusBadge(w)}<div class="eyebrow">MAKING SENTENCES · ${level==='easy'?'EASY':level==='normal'?'NORMAL':level==='hard'?'HARD':'MIXED'}</div><p class="subhead">Quyidagi gapning inglizchasini yozing.</p><div class="flash-word" style="font-size:25px">${esc(ex.uz)}</div><p class="subhead">Target word: ${esc(w.translation)}</p><form onsubmit="event.preventDefault();checkSentence()"><textarea id="sentence-answer" class="field" rows="3" placeholder="Write the English sentence…" style="margin:12px 0"></textarea><button class="btn primary full" type="submit">Check answer</button></form><div id="sentence-feedback" class="subhead" style="margin-top:12px"></div></section>`}
-async function loadSentenceExamples(id){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples={...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('AI gaplar tayyor!')}catch(e){aiLastError=e?.message||'Unknown AI error';console.error('Sentence AI error:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
-function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id)}
+async function loadSentenceExamples(id,force=false){const w=S.words.find(x=>x.id===id);if(!w||sentenceAiPending.has(id))return;if(!groqApiKey){sentenceAiError.add(id);render();return}sentenceAiPending.add(id);render();try{const ex=await aiExamples(w.word,w.translation);w.examples=force?ex:{...(w.examples||{}),...ex};sentenceAiError.delete(id);save();toast('Example sentences are ready.')}catch(e){aiLastError=e?.message||'Unknown AI error';console.error('Missing Word sentence generation failed:',aiLastError);sentenceAiError.add(id)}finally{sentenceAiPending.delete(id);render()}}
+function retrySentenceAI(id){sentenceAiError.delete(id);loadSentenceExamples(id,true)}
+
 async function aiGradeSentence(answer,target,word,nextWord=null,nextLevel='easy'){
  if(!AI_PROXY_URL)throw new Error('AI serveri hali sozlanmagan.');
  const needNext=!!(nextWord&&nextWord.word&&nextWord.translation&&!nextWord.examples?.easy?.en&&!nextWord.examples?.normal?.en&&!nextWord.examples?.hard?.en);
@@ -1264,7 +1265,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     {id:'flash',label:'Flashcards'},
     {id:'match',label:'Matching'},
     {id:'write',label:'Write the English word'},
-    {id:'sentence',label:'Sentence translation'},
+    {id:'sentence',label:'Missing Word'},
     {id:'conversation',label:'Real conversations'}
   ];
   const statusText={new:'New',learning:'Learning',ready:'Ready to use'};
@@ -1306,7 +1307,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     {id:'flash',title:'Flashcards',desc:'Recall the meaning'},
     {id:'match',title:'Matching',desc:'Match words and meanings'},
     {id:'write',title:'Writing',desc:'Write the English word'},
-    {id:'sentence',title:'Making sentences',desc:'Build a complete sentence'}
+    {id:'sentence',title:'Missing Word',desc:'Complete the sentence'}
   ];
   function exerciseIcon(id){
     const common='viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"';
@@ -1425,7 +1426,7 @@ body .app .translator-icon-btn.mic.is-listening{background:linear-gradient(135de
     }
     originalStartTask(id);
   };
-  const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Making sentences'};
+  const modeLabels={flash:'Flashcards',match:'Matching',write:'Writing',sentence:'Missing Word'};
   function setTaskTransition(id){taskTransitionLabel=modeLabels[id]||''}
   window.startGroupTask=function(group,requestedIndex=0){
     const p=progressFor();
