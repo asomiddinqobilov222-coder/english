@@ -140,6 +140,11 @@
   }
   function currentSession(){return run?.sessions?.[run.skillIndex]||null}
   function currentSkill(){return SKILLS[run?.skillIndex]||null}
+  function shufflePresentation(question){
+    const order=question.choices.map((_,index)=>index);
+    for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    return {...question,choices:order.map(index=>question.choices[index]),answer:order.indexOf(question.answer)};
+  }
   function getNextQuestion(){
     while(run.skillIndex<SKILLS.length){
       const session=currentSession();
@@ -152,7 +157,7 @@
         run.skillIndex++;
         continue;
       }
-      run.question=question;
+      run.question=shufflePresentation(question);
       run.questionStartedAt=Date.now();
       run.feedback=null;
       renderQuestion();
@@ -167,14 +172,11 @@
     const progress=(session.answers.length/Core.QUESTIONS_PER_SKILL)*100;
     const options=question.choices.map((choice,index)=>{
       let state='';
-      if(run.feedback){
-        if(index===question.answer)state=' is-correct';
-        else if(index===run.feedback.selectedIndex)state=' is-wrong';
-      }
+      if(run.feedback&&index===run.feedback.selectedIndex)state=' is-selected';
       return '<button type="button" class="assessment-option'+state+'" '+(run.feedback?'disabled':'')+' onclick="window.answerEngliwordsAssessment('+index+')">'+String.fromCharCode(65+index)+'. '+esc(choice)+'</button>';
     }).join('');
     const feedback=run.feedback?
-      '<div class="assessment-feedback"><b>'+(run.feedback.skipped?'Skipped':run.feedback.correct?'Correct':'Not quite')+'</b><div style="margin-top:5px">'+esc(question.explanation)+'</div>'+(run.feedback.skipped?'':'<div style="margin-top:5px">Correct answer: <b>'+esc(question.choices[question.answer])+'</b></div>')+'</div>':'';
+      '<div class="assessment-feedback"><b>'+(run.feedback.skipped?'Question skipped':'Answer recorded')+'</b><div style="margin-top:5px">'+(run.feedback.skipped?'This is counted as missing evidence.':'The next question will adapt to your answers.')+'</div></div>':'';
     const actions=run.feedback?
       '<div class="assessment-actions"><button class="assessment-primary" onclick="window.nextEngliwordsAssessmentQuestion()">Next question</button></div>':
       '<div class="assessment-actions"><button class="assessment-secondary" onclick="window.skipEngliwordsAssessmentQuestion()">Skip question</button></div>';
