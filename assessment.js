@@ -92,7 +92,8 @@
     const rows=SKILLS.map(skill=>{
       const item=skills[skill];
       if(!item)return '<div class="assessment-result-row"><span>'+SKILL_LABELS[skill]+'</span><b>Not assessed</b></div>';
-      return '<div class="assessment-result-row"><span><b>'+SKILL_LABELS[skill]+'</b><div class="assessment-small">'+confidenceLabel(item.confidence)+' · '+item.answered+'/10 answers · '+item.score+'% correct</div></span><b>'+esc(levelText(item))+'</b></div>';
+      const levelDetails=Object.entries(item.levelStats||{}).sort((a,b)=>Core.levelIndex(a[0])-Core.levelIndex(b[0])).map(([level,stats])=>'<div class="assessment-small" style="margin-top:5px"><b>'+esc(level)+'</b> · '+stats.correct+'/'+stats.total+' correct'+(stats.topics?.length?' · Topics: '+stats.topics.map(esc).join(', '):'')+'</div>').join('');
+      return '<div class="assessment-result-row"><span><b>'+SKILL_LABELS[skill]+'</b><div class="assessment-small">'+confidenceLabel(item.confidence)+' · '+item.answered+'/10 answers · '+item.score+'% correct</div>'+levelDetails+'</span><b>'+esc(levelText(item))+'</b></div>';
     }).join('');
     const overall=result?.overall||{};
     return '<div class="assessment-detail"><div class="assessment-result-row"><span>Overall estimate</span><b>'+esc(overall.range||overall.level||'Incomplete')+'</b></div>'+rows+
