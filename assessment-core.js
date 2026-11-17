@@ -147,8 +147,8 @@
     };
   }
   function combineResults(vocabulary,grammar){
-    if(!vocabulary||!grammar||vocabulary.answered<6||grammar.answered<6){
-      return {status:'incomplete',level:null,range:null,practiceLevel:null,confidence:'low',coverage:'1 of 2 skills'};
+    if(!vocabulary||!grammar||vocabulary.answered<9||grammar.answered<9){
+      return {status:'incomplete',level:null,range:null,practiceLevel:null,confidence:'low',coverage:'At least 9 answers per skill are required'};
     }
     const low=Math.min(vocabulary.levelIndex,grammar.levelIndex);
     const high=Math.max(vocabulary.levelIndex,grammar.levelIndex);
