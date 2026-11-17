@@ -274,12 +274,15 @@
     renderIntro();
   };
 
-  function vocabularyPracticeBand(){
-    const result=latest(),skill=result?.skills?.vocabulary;
-    return Core.exerciseDifficulty(skill?.level||'A1');
+  function sentencePracticeBand(){
+    const result=latest(),skills=result?.skills||{};
+    const vocabularyIndex=Core.levelIndex(skills.vocabulary?.level||'A1');
+    const grammarIndex=Core.levelIndex(skills.grammar?.level||'A1');
+    // Sentence examples must stay within the weaker of the two assessed skills.
+    return Core.exerciseDifficulty(Core.levelName(Math.min(vocabularyIndex,grammarIndex)));
   }
-  if(typeof sentenceLevel==='function')sentenceLevel=function(){return vocabularyPracticeBand()};
-  if(typeof levelFor==='function')levelFor=function(){return vocabularyPracticeBand()};
+  if(typeof sentenceLevel==='function')sentenceLevel=function(){return sentencePracticeBand()};
+  if(typeof levelFor==='function')levelFor=function(){return sentencePracticeBand()};
   if(typeof buildMissingWordQuestion==='function'){
     buildMissingWordQuestion=function(word,preferredLevel){
       const order=preferredLevel==='hard'?['hard','normal','easy']:preferredLevel==='normal'?['normal','easy','hard']:['easy','normal','hard'];
@@ -310,7 +313,7 @@
       return {wordId:word.id,level:selected.level,sentence,translation:selected.ex.uz||word.translation||'',options:shuffleMissingWord(options),selected:null,checked:false,correctWord:word.word};
     };
   }
-  window.engliwordsAssessmentPracticeBand=vocabularyPracticeBand;
+  window.engliwordsAssessmentPracticeBand=sentencePracticeBand;
   window.EngliwordsAssessment={core:Core,bank:()=>BANK,validateBank:()=>bankErrors.slice()};
   if(typeof render==='function')render();
 })();
