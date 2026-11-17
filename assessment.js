@@ -45,6 +45,7 @@
     #assessment-overlay .assessment-result-row:last-child{border-bottom:0}
     #assessment-overlay .assessment-small{font-size:11px;color:#aabbd2;line-height:1.5}
     #assessment-overlay .assessment-close{border:1px solid #ffffff28;background:#20344f;color:#fff;border-radius:12px;padding:8px 12px}
+    #modal-root .modal-back{z-index:100600}
     body[data-theme="day"] #assessment-overlay{background:linear-gradient(180deg,#eaf6ff,#d7edfc 60%,#edf8ff);color:#20364e}
     body[data-theme="day"] #assessment-overlay .assessment-panel{background:#ffffffed;border-color:#cfe2f1;box-shadow:0 15px 35px #4a86b51a}
     body[data-theme="day"] #assessment-overlay .assessment-muted,body[data-theme="day"] #assessment-overlay .assessment-small{color:#607990}
