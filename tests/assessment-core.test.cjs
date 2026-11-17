@@ -63,6 +63,19 @@ test('questions are never repeated in one skill session',()=>{
   assert.equal(ids.size,10);
   assert.equal(session.answers.length,10);
 });
+
+test('an inconclusive result at the starting band does not incorrectly default to A1',()=>{
+  const session=core.createSkillSession('vocabulary','A2');
+  const bank=makeBank('vocabulary',12,'A2');
+  for(let i=0;i<10;i++){
+    const q=core.nextQuestion(session,bank,()=>i/10);
+    core.recordAnswer(session,q,i%4<2?0:1,3000);
+  }
+  const result=core.finalizeSkill(session);
+  assert.equal(result.level,'A2');
+  assert.equal(result.confidence,'low');
+});
+
 test('exercise difficulty remains conservative',()=>{
   assert.equal(core.exerciseDifficulty('A1'),'easy');
   assert.equal(core.exerciseDifficulty('A2'),'easy');

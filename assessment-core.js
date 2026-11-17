@@ -115,7 +115,7 @@
     const testedLevels=[...new Set(answers.map(a=>a.level))].sort((a,b)=>levelIndex(a)-levelIndex(b));
     const attemptedIndexes=answers.map(a=>levelIndex(a.level));
     const highestAttempted=attemptedIndexes.length?Math.max(...attemptedIndexes):0;
-    const practiceIndex=Math.max(0,session.highestPassedIndex);
+    const practiceIndex=Math.max(0,session.highestPassedIndex>=0?session.highestPassedIndex:session.currentLevelIndex);
     const borderlineIndexes=LEVELS.map((level,index)=>{
       const s=session.levelStats[level];
       if(!s||s.total<2)return -1;
