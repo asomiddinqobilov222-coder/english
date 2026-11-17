@@ -98,7 +98,7 @@
         ["If they had left earlier, they ___ the train.",["would catch","would have caught","will have caught","had caught"],1,"third conditional","The third conditional describes an unreal past: if + past perfect, would have + past participle."],
         ["You ___ have told me; I could have helped.",["should","must","can","may"],0,"modal perfects","Should have expresses a past action that was advisable but did not happen."],
         ["By next June, she ___ here for ten years.",["works","will have worked","has worked","would work"],1,"future perfect","Use the future perfect for an action completed by a future time."],
-        ["The proposal, ___ by the committee, was revised.",["rejecting","having rejected","which rejecting","which had rejected"],1,"participle clauses","Having been rejected would be the passive form; the active form here needs a subject. This item is intentionally replaced below."],
+        ["The proposal, ___ by the committee, was revised.",["having been rejected","having rejected","rejecting","to reject"],0,"participle clauses","Having been rejected is a perfect passive participle clause showing that the rejection happened before the revision."] ,
         ["Not only ___ late, but he also forgot the documents.",["he was","was he","he had","did he was"],1,"inversion","After fronted 'not only', invert the subject and auxiliary."],
         ["I wish I ___ so much time yesterday.",["didn't waste","haven't wasted","hadn't wasted","wouldn't waste"],2,"wish about the past","Use past perfect after wish to express regret about a past event."],
         ["The more you practise, ___ you become.",["the fluent","more fluent","the more fluent","most fluent"],2,"comparative structures","The pattern is the + comparative, the + comparative."],
