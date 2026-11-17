@@ -70,6 +70,11 @@ test('exercise difficulty is conservative and follows vocabulary level',()=>{
   assert.equal(core.exerciseDifficulty('C1'),'hard');
   assert.equal(core.exerciseDifficulty('C2'),'hard');
 });
+test('overall estimate requires at least nine answers in each skill',()=>{
+  const vocabulary={level:'B2',levelIndex:3,rangeHigh:'C1',answered:8,confidence:'medium'};
+  const grammar={level:'A2',levelIndex:1,rangeHigh:'B1',answered:10,confidence:'medium'};
+  assert.equal(core.combineResults(vocabulary,grammar).status,'incomplete');
+});
 test('overall estimate uses the lower skill level rather than averaging upward',()=>{
   const vocabulary={level:'B2',levelIndex:3,rangeHigh:'C1',answered:10,confidence:'medium'};
   const grammar={level:'A2',levelIndex:1,rangeHigh:'B1',answered:10,confidence:'medium'};
