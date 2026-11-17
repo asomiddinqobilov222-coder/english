@@ -76,5 +76,5 @@ test('overall estimate uses the lower skill level rather than averaging upward',
   const overall=core.combineResults(vocabulary,grammar);
   assert.equal(overall.level,'A2');
   assert.equal(overall.practiceLevel,'A2');
-  assert.equal(overall.range,'A2–C1');
+  assert.equal(overall.range,'A2–B2');
 });
