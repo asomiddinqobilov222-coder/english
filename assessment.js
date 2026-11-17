@@ -204,6 +204,7 @@
   };
   window.beginEngliwordsAssessment=function(){
     if(!run)return;
+    run.startedAt=Date.now();
     run.status='running';
     run.deadlineAt=Date.now()+TIME_LIMIT_MS;
     startTimer();
