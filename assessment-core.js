@@ -106,6 +106,7 @@
   function finalizeSkill(session){
     if(!session)return null;
     const answers=session.answers||[];
+    if(answers.length<6)return null;
     const correct=answers.filter(a=>a.correct).length;
     const skipped=answers.filter(a=>a.skipped).length;
     const testedLevels=[...new Set(answers.map(a=>a.level))].sort((a,b)=>levelIndex(a)-levelIndex(b));
@@ -150,9 +151,8 @@
       return {status:'incomplete',level:null,range:null,practiceLevel:null,confidence:'low',coverage:'1 of 2 skills'};
     }
     const low=Math.min(vocabulary.levelIndex,grammar.levelIndex);
-    const high=Math.max(vocabulary.rangeHigh?levelIndex(vocabulary.rangeHigh):vocabulary.levelIndex,
-      grammar.rangeHigh?levelIndex(grammar.rangeHigh):grammar.levelIndex);
-    const confidence=vocabulary.confidence==='medium'&&grammar.confidence==='medium'?'medium':'low';
+    const high=Math.max(vocabulary.levelIndex,grammar.levelIndex);
+    const confidence=vocabulary.confidence==='medium'&&grammar.confidence==='medium'&&high-low<=1?'medium':'low';
     return {
       status:'provisional',
       level:levelName(low),
