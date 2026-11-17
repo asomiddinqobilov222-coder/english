@@ -8,6 +8,9 @@
   const LEVELS=['A1','A2','B1','B2','C1','C2'];
   const START_LEVEL='A2';
   const QUESTIONS_PER_SKILL=10;
+  const DECISION_BATCH_SIZE=4;
+  const PASS_THRESHOLD=3;
+  const FAIL_THRESHOLD=1;
   const MAX_INITIAL_CONFIDENCE='medium';
 
   function levelIndex(level){
@@ -84,16 +87,16 @@
     else stats.incorrect++;
     if(question.topic&&!stats.topics.includes(question.topic))stats.topics.push(question.topic);
     session.pair.push({correct,levelIndex:index});
-    if(session.pair.length===2){
+    if(session.pair.length===DECISION_BATCH_SIZE){
       const pair=session.pair;
       const sameLevel=pair.every(item=>item.levelIndex===pair[0].levelIndex);
       if(sameLevel){
         const pairLevel=pair[0].levelIndex;
         const pairCorrect=pair.filter(item=>item.correct).length;
-        if(pairCorrect===2){
+        if(pairCorrect>=PASS_THRESHOLD){
           session.highestPassedIndex=Math.max(session.highestPassedIndex,pairLevel);
           session.currentLevelIndex=Math.min(LEVELS.length-1,pairLevel+1);
-        }else if(pairCorrect===0){
+        }else if(pairCorrect<=FAIL_THRESHOLD){
           session.currentLevelIndex=Math.max(0,pairLevel-1);
         }else{
           session.currentLevelIndex=pairLevel;
@@ -124,7 +127,8 @@
     const fastRate=answers.length?fastCount/answers.length:0;
     const answered=answers.length;
     const distinctTopics=new Set(answers.map(a=>a.topic).filter(Boolean)).size;
-    const hasClearEvidence=session.highestPassedIndex>=0;
+    const passedStats=session.levelStats[levelName(practiceIndex)];
+    const hasClearEvidence=session.highestPassedIndex>=0&&Boolean(passedStats&&passedStats.total>=DECISION_BATCH_SIZE&&passedStats.correct>=PASS_THRESHOLD);
     const confidence=answered>=9&&hasClearEvidence&&testedLevels.length>=2&&distinctTopics>=4&&fastRate<0.5&&skipped<=1
       ? 'medium':'low';
     return {
@@ -180,7 +184,7 @@
     return result;
   }
   return {
-    LEVELS,START_LEVEL,QUESTIONS_PER_SKILL,MAX_INITIAL_CONFIDENCE,
+    LEVELS,START_LEVEL,QUESTIONS_PER_SKILL,DECISION_BATCH_SIZE,PASS_THRESHOLD,FAIL_THRESHOLD,MAX_INITIAL_CONFIDENCE,
     levelIndex,levelName,createSkillSession,validateBank,nextQuestion,
     recordAnswer,finalizeSkill,combineResults,exerciseDifficulty,summarizeBank
   };
