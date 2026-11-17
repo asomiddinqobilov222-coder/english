@@ -71,8 +71,9 @@
       return '<section class="panel assessment-card"><div class="eyebrow">ENGLISH LEVEL</div><h3 class="section-title" style="margin:6px 0">Personal level assessment</h3><p class="subhead">Sign in to save your assessment and use it to adjust your practice.</p><div class="assessment-actions"><button class="btn primary" onclick="cloudLogin()">Sign in</button></div></section>';
     }
     if(!result){
-      const partial=store().lastAttempt?.overall?.status==='incomplete';
-      return '<section class="panel assessment-card"><div class="eyebrow">ENGLISH LEVEL</div><h3 class="section-title" style="margin:6px 0">'+(partial?'Assessment not completed':'Your current level')+'</h3><div class="assessment-level">'+(partial?'—':'Not assessed')+'</div><p class="assessment-meta">15-minute Vocabulary + Grammar diagnostic</p><div class="assessment-actions"><button class="btn primary" onclick="window.startEngliwordsAssessment()">Start assessment</button></div></section>';
+      const attempt=store().lastAttempt;
+      const partial=attempt&&(attempt.overall?.status==='incomplete'||attempt.overall?.confidence==='low');
+      return '<section class="panel assessment-card"><div class="eyebrow">ENGLISH LEVEL</div><h3 class="section-title" style="margin:6px 0">'+(partial?'More evidence needed':'Your current level')+'</h3><div class="assessment-level">'+(partial?'—':'Not assessed')+'</div><p class="assessment-meta">'+(partial?'The last check was not reliable enough to adjust practice.':'15-minute Vocabulary + Grammar diagnostic')+'</p><div class="assessment-actions"><button class="btn primary" onclick="window.startEngliwordsAssessment()">'+(partial?'Try again':'Start assessment')+'</button></div></section>';
     }
     const overall=result.overall||{};
     const value=overall.range||overall.level||'—';
@@ -217,7 +218,8 @@
       const item=result.skills[skill];
       return '<div class="assessment-result-row"><span>'+SKILL_LABELS[skill]+'</span><b>'+(item?esc(levelText(item))+' · '+confidenceLabel(item.confidence):'Incomplete')+'</b></div>';
     }).join('');
-    root.innerHTML='<div class="assessment-shell"><div class="assessment-top"><div class="assessment-brand">Engliwords · Results</div><button class="assessment-close" onclick="window.closeEngliwordsAssessment()">Close</button></div><section class="assessment-panel"><div class="assessment-eyebrow">YOUR LEARNING ESTIMATE</div><h2>'+esc(value)+'</h2><p class="assessment-muted">'+(overall.status==='provisional'?'This is a conservative preliminary estimate based on two skills.':'The assessment ended before enough evidence was collected for an overall estimate.')+'</p>'+rows+'<p class="assessment-small" style="margin-top:14px">This is not an official CEFR certificate. Reading, Listening, Writing, and Speaking have not been assessed yet. The first result has low-to-moderate confidence and can change as more evidence is collected.</p><div class="assessment-actions"><button class="assessment-primary" onclick="window.closeEngliwordsAssessment()">View profile</button></div></section></div>';
+    const message=overall.status!=='provisional'?'Not enough answers were collected in both skills. No overall level has been assigned.':overall.confidence!=='medium'?'A possible range is shown, but the evidence is not strong enough to change your saved practice level. Complete another check later.':'This is a conservative preliminary estimate based on two skills.';
+    root.innerHTML='<div class="assessment-shell"><div class="assessment-top"><div class="assessment-brand">Engliwords · Results</div><button class="assessment-close" onclick="window.closeEngliwordsAssessment()">Close</button></div><section class="assessment-panel"><div class="assessment-eyebrow">YOUR LEARNING ESTIMATE</div><h2>'+esc(value)+'</h2><p class="assessment-muted">'+message+'</p>'+rows+'<p class="assessment-small" style="margin-top:14px">This is not an official CEFR certificate. Reading, Listening, Writing, and Speaking have not been assessed yet. Only a sufficiently complete, consistent result can change your saved practice level.</p><div class="assessment-actions"><button class="assessment-primary" onclick="window.closeEngliwordsAssessment()">View profile</button></div></section></div>';
   }
   function finishAssessment(timedOut){
     if(!run||run.status==='finished')return;
@@ -240,7 +242,7 @@
     data.lastAttempt=result;
     data.history.unshift(result);
     data.history=data.history.slice(0,10);
-    if(overall.status==='provisional')data.latest=result;
+    if(overall.status==='provisional'&&overall.confidence==='medium')data.latest=result;
     save();
     renderResult(result);
   }
