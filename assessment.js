@@ -11,7 +11,7 @@
 
   const style=document.createElement('style');
   style.id='engliwords-assessment-style';
-  style.textContent=\`
+  style.textContent=`
     .assessment-card{position:relative;overflow:hidden}
     .assessment-card .assessment-level{font-size:34px;font-weight:900;letter-spacing:-1px;line-height:1.1;color:var(--cyan)}
     .assessment-card .assessment-meta{font-size:12px;color:var(--muted);margin-top:5px}
@@ -53,7 +53,7 @@
     body[data-theme="day"] #assessment-overlay .assessment-timer{background:#e1f7f3;color:#176f72;border-color:#b5e5db}
     body[data-theme="day"] #assessment-overlay .assessment-secondary{background:#eaf2fa;color:#294b69;border-color:#d0e2f1}
     @media(max-width:520px){#assessment-overlay .assessment-panel{padding:17px;border-radius:19px}#assessment-overlay .assessment-question{margin:16px 0}#assessment-overlay .assessment-actions{flex-direction:column}}
-  \`;
+  `;
   document.head.appendChild(style);
 
   function store(){
